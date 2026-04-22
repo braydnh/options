@@ -1,13 +1,16 @@
 import Link from 'next/link'
 import { StrategyBadge } from '@/components/ui/StrategyBadge'
 import { DteBadge } from '@/components/ui/DteBadge'
-import type { Trade } from '@/types'
+import { PnlBadge } from '@/components/ui/PnlBadge'
+import { calcUnrealizedPnl, calcCapitalSecured } from '@/lib/calculations'
+import type { Trade, PriceMap } from '@/types'
 
 interface Props {
   openTrades: Trade[]
+  prices: PriceMap
 }
 
-export function PositionsPreview({ openTrades }: Props) {
+export function PositionsPreview({ openTrades, prices }: Props) {
   const sorted = [...openTrades]
     .sort((a, b) => new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime())
     .slice(0, 5)
@@ -26,7 +29,7 @@ export function PositionsPreview({ openTrades }: Props) {
         <table className="w-full">
           <thead>
             <tr className="border-b border-border">
-              {['Ticker', 'Type', 'Strike', 'Premium', 'DTE'].map((h) => (
+              {['Ticker', 'Type', 'Strike', 'Live Price', 'Premium', 'Unreal. P&L', 'DTE'].map((h) => (
                 <th key={h} className="py-2 px-5 text-left text-[10px] tracking-widest text-text-muted uppercase font-normal">
                   {h}
                 </th>
@@ -34,15 +37,46 @@ export function PositionsPreview({ openTrades }: Props) {
             </tr>
           </thead>
           <tbody>
-            {sorted.map((t) => (
-              <tr key={t.id} className="border-b border-border last:border-0">
-                <td className="py-2.5 px-5 text-sm font-semibold text-white">{t.ticker}</td>
-                <td className="py-2.5 px-5"><StrategyBadge strategy={t.strategy} /></td>
-                <td className="py-2.5 px-5 text-sm tabular-nums">${t.strike_price.toFixed(2)}</td>
-                <td className="py-2.5 px-5 text-sm tabular-nums text-accent-green">+${t.premium_in.toFixed(0)}</td>
-                <td className="py-2.5 px-5"><DteBadge expiryDate={t.expiry_date} /></td>
-              </tr>
-            ))}
+            {sorted.map((t) => {
+              const livePrice = prices[t.ticker]
+              const unrealizedPnl = livePrice !== undefined
+                ? calcUnrealizedPnl(t.strategy, t.premium_in, t.strike_price, t.contracts, livePrice)
+                : null
+              const capital = calcCapitalSecured(t.strike_price, t.contracts)
+              const unrealizedPct = unrealizedPnl !== null && capital > 0
+                ? (unrealizedPnl / capital) * 100
+                : null
+
+              return (
+                <tr key={t.id} className="border-b border-border last:border-0">
+                  <td className="py-2.5 px-5 text-sm font-semibold text-white">{t.ticker}</td>
+                  <td className="py-2.5 px-5"><StrategyBadge strategy={t.strategy} /></td>
+                  <td className="py-2.5 px-5 text-sm tabular-nums">${t.strike_price.toFixed(2)}</td>
+                  <td className="py-2.5 px-5 text-sm tabular-nums">
+                    {livePrice !== undefined
+                      ? <span className="text-white">${livePrice.toFixed(2)}</span>
+                      : <span className="text-text-muted animate-pulse">···</span>
+                    }
+                  </td>
+                  <td className="py-2.5 px-5 text-sm tabular-nums text-accent-green">+${t.premium_in.toFixed(0)}</td>
+                  <td className="py-2.5 px-5">
+                    {unrealizedPnl !== null ? (
+                      <div className="flex flex-col gap-0.5">
+                        <PnlBadge value={Math.round(unrealizedPnl)} />
+                        {unrealizedPct !== null && (
+                          <span className={`text-[10px] tabular-nums ${unrealizedPct >= 0 ? 'text-accent-green/70' : 'text-accent-red/70'}`}>
+                            {unrealizedPct >= 0 ? '+' : ''}{unrealizedPct.toFixed(2)}%
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-text-muted text-sm">—</span>
+                    )}
+                  </td>
+                  <td className="py-2.5 px-5"><DteBadge expiryDate={t.expiry_date} /></td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       )}
