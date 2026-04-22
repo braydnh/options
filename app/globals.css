@@ -12,6 +12,21 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@theme {
+  --color-bg-base: #0F0F0F;
+  --color-bg-panel: #1A1A1A;
+  --color-bg-hover: #222222;
+  --color-border: #2A2A2A;
+  --color-border-subtle: #1F1F1F;
+  --color-text-primary: #FFFFFF;
+  --color-text-muted: #555555;
+  --color-text-dim: #333333;
+  --color-accent-green: #22C55E;
+  --color-accent-red: #F87171;
+  --color-accent-purple: #A78BFA;
+  --color-accent-amber: #F59E0B;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
