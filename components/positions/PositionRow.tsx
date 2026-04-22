@@ -25,6 +25,9 @@ export function PositionRow({ trade, livePrice, onAction }: Props) {
       : null
 
   const capital = calcCapitalSecured(trade.strike_price, trade.contracts)
+  const unrealizedPct = unrealizedPnl !== null && capital > 0
+    ? (unrealizedPnl / capital) * 100
+    : null
 
   return (
     <tr className="border-b border-border hover:bg-bg-hover transition-colors group">
@@ -49,7 +52,14 @@ export function PositionRow({ trade, livePrice, onAction }: Props) {
       </td>
       <td className="py-3 px-4">
         {unrealizedPnl !== null ? (
-          <PnlBadge value={Math.round(unrealizedPnl)} />
+          <div className="flex flex-col gap-0.5">
+            <PnlBadge value={Math.round(unrealizedPnl)} />
+            {unrealizedPct !== null && (
+              <span className={`text-[10px] tabular-nums ${unrealizedPct >= 0 ? 'text-accent-green/70' : 'text-accent-red/70'}`}>
+                {unrealizedPct >= 0 ? '+' : ''}{unrealizedPct.toFixed(2)}%
+              </span>
+            )}
+          </div>
         ) : (
           <span className="text-text-muted text-sm">—</span>
         )}
