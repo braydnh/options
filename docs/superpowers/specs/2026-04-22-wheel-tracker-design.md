@@ -79,7 +79,7 @@ No `price_cache` table — live prices come via Finnhub WebSocket and are never 
 | `dte` | `expiry_date − today` |
 | `capital_secured` | `strike_price × contracts × 100` |
 | `realized_p_l` | `net_premium` (when status = closed or assigned) |
-| `unrealized_p_l` | Stock price directional indicator only — Finnhub free tier provides underlying stock price, not option chain marks. Display shows live stock price vs strike to indicate in/out of the money. Exact option mark not available without a paid API. |
+| `unrealized_p_l` | **CSP:** `premium_in − max(strike − stock_price, 0) × contracts × 100` / **CC:** `premium_in − max(stock_price − strike, 0) × contracts × 100`. Uses live stock price from Finnhub + the premium_in already stored. Ignores time value (theta/vega) — intrinsic-only approximation, conservative and sufficient for Wheel tracking. |
 | `return_on_capital_pct` | `net_premium / capital_secured` |
 | `annualized_return_pct` | `return_on_capital_pct × (365 / days_held)` |
 
@@ -159,7 +159,7 @@ lib/
 ### Positions (`/positions`)
 
 - Full table of all open trades sorted by DTE ascending
-- **Columns:** Ticker, Type badge (CSP=purple / CC=green), Strike, Live Price (live via Finnhub WS), Premium In, Unrealized P&L, DTE bar + days count, Actions
+- **Columns:** Ticker, Type badge (CSP=purple / CC=green), Strike, Live Stock Price (live via Finnhub WS), Premium In, Unrealized P&L (calculated from live price + premium_in + strike), DTE bar + days count, Actions
 - **Actions per row:** Close (opens slide-in with Premium Out field), Assign (marks as assigned, prompts for shares + cost basis), Roll (opens slide-in to log a new linked trade)
 - Finnhub WebSocket subscribes to all open tickers on mount, unsubscribes on unmount
 - DTE bar colour: >21d = green, 8–21d = amber, ≤7d = red
@@ -220,7 +220,7 @@ useFinnhubPrices(tickers: string[]) → { [ticker: string]: number }
 - On unmount: sends `{"type":"unsubscribe"}` for each ticker, closes socket
 - Only active on the Positions page and Dashboard preview (Dashboard uses stale-while-revalidate from Supabase, not live WS)
 
-Note: Finnhub free tier provides the underlying stock's last trade price, not option chain mid prices. The Positions table therefore shows the live stock price alongside your strike — green if the stock is safely above your CSP strike (or below your CC strike), red if it has moved against you. This is the relevant signal for the Wheel strategy. Exact option mark-to-market P&L would require a paid options data API (e.g. Polygon.io options tier) and is out of scope.
+Finnhub free tier provides the underlying stock's last trade price. Combined with the stored `premium_in` and `strike_price`, unrealized P&L is calculated client-side using intrinsic value only (ignoring theta/vega). This is a conservative approximation — actual buyback cost will be slightly higher due to time value, meaning real P&L is slightly better than displayed. Sufficient for Wheel strategy tracking.
 
 ---
 
