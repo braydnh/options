@@ -16,6 +16,7 @@ interface TradePanelProps {
 
 const TITLES: Record<TradePanelMode, string> = {
   open: 'New Trade',
+  edit: 'Edit Trade',
   close: 'Close Trade',
   assign: 'Mark as Assigned',
   roll: 'Roll Trade',
@@ -64,6 +65,14 @@ export function TradePanel({
           {mode === 'open' && (
             <TradePanelForm
               openTrades={openTrades}
+              onSuccess={() => { onSuccess(); onClose() }}
+              onCancel={onClose}
+            />
+          )}
+          {mode === 'edit' && trade && (
+            <TradePanelForm
+              openTrades={openTrades.filter((t) => t.id !== trade.id)}
+              initialTrade={trade}
               onSuccess={() => { onSuccess(); onClose() }}
               onCancel={onClose}
             />
@@ -179,6 +188,8 @@ function CloseAssignForm({ mode, trade, onSuccess, onCancel }: CloseAssignFormPr
         linked_trade_id: trade.id,
         notes: `Rolled from ${trade.ticker} ${trade.strategy === 'cash_secured_put' ? 'CSP' : 'CC'} $${trade.strike_price}`,
         date_closed: null,
+        delta: null,
+        iv: null,
       })
       onSuccess()
     } catch (err) {

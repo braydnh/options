@@ -24,6 +24,8 @@ export interface Trade {
   cost_basis: number | null
   linked_trade_id: string | null
   notes: string | null
+  delta: number | null
+  iv: number | null
 }
 
 export interface NewTradeInput {
@@ -37,6 +39,8 @@ export interface NewTradeInput {
   brokerage_fees: number
   notes: string
   linked_trade_id: string | null
+  delta: number | null
+  iv: number | null
 }
 
 export interface CloseTradeInput {
@@ -49,7 +53,7 @@ export interface CloseTradeInput {
   cost_basis?: number
 }
 
-export type TradePanelMode = 'open' | 'close' | 'assign' | 'roll'
+export type TradePanelMode = 'open' | 'close' | 'assign' | 'roll' | 'edit'
 
 export interface PriceMap {
   [ticker: string]: number

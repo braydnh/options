@@ -4,13 +4,14 @@ import { useState, useMemo } from 'react'
 import { StrategyBadge } from '@/components/ui/StrategyBadge'
 import { PnlBadge } from '@/components/ui/PnlBadge'
 import { calcNetPremium, calcReturnOnCapital, calcCapitalSecured } from '@/lib/calculations'
-import type { Trade } from '@/types'
+import type { Trade, TradePanelMode } from '@/types'
 
 interface Props {
   trades: Trade[]
+  onAction: (trade: Trade, mode: TradePanelMode) => void
 }
 
-export function HistoryTable({ trades }: Props) {
+export function HistoryTable({ trades, onAction }: Props) {
   const [tickerFilter, setTickerFilter] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
@@ -56,7 +57,7 @@ export function HistoryTable({ trades }: Props) {
         <table className="w-full">
           <thead>
             <tr className="border-b border-border">
-              {['Ticker', 'Type', 'Strike', 'Expiry', 'Contracts', 'Premium In', 'Buyback', 'Net P&L', 'ROC%', 'Outcome', 'Closed'].map((h) => (
+              {['Ticker', 'Type', 'Strike', 'Expiry', 'Contracts', 'Premium In', 'Buyback', 'Net P&L', 'ROC%', 'Delta', 'IV%', 'Outcome', 'Closed', ''].map((h) => (
                 <th key={h} className="py-2 px-4 text-left text-[10px] tracking-widest text-text-muted uppercase font-normal whitespace-nowrap">
                   {h}
                 </th>
@@ -73,7 +74,7 @@ export function HistoryTable({ trades }: Props) {
               return (
                 <tr
                   key={t.id}
-                  className="border-b border-border last:border-0 hover:bg-bg-hover transition-colors"
+                  className="border-b border-border last:border-0 hover:bg-bg-hover transition-colors group"
                 >
                   <td className="py-2.5 px-4">
                     {isLinked && <span className="text-text-muted mr-1 text-xs">↳</span>}
@@ -91,6 +92,12 @@ export function HistoryTable({ trades }: Props) {
                   <td className="py-2.5 px-4 text-sm tabular-nums text-accent-purple">
                     {(roc * 100).toFixed(2)}%
                   </td>
+                  <td className="py-2.5 px-4 text-sm tabular-nums text-accent-purple">
+                    {t.delta !== null && t.delta !== undefined ? t.delta.toFixed(2) : '—'}
+                  </td>
+                  <td className="py-2.5 px-4 text-sm tabular-nums text-accent-amber">
+                    {t.iv !== null && t.iv !== undefined ? `${t.iv.toFixed(1)}%` : '—'}
+                  </td>
                   <td className="py-2.5 px-4">
                     <span className={`text-xs px-2 py-0.5 rounded border ${
                       t.status === 'assigned'
@@ -103,6 +110,14 @@ export function HistoryTable({ trades }: Props) {
                     </span>
                   </td>
                   <td className="py-2.5 px-4 text-sm text-text-muted tabular-nums">{t.date_closed ?? '—'}</td>
+                  <td className="py-2.5 px-4">
+                    <button
+                      onClick={() => onAction(t, 'edit')}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 text-xs text-text-muted border border-border rounded hover:text-white hover:border-accent-purple/50"
+                    >
+                      Edit
+                    </button>
+                  </td>
                 </tr>
               )
             })}

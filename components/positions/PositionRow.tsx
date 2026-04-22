@@ -3,7 +3,7 @@
 import { StrategyBadge } from '@/components/ui/StrategyBadge'
 import { PnlBadge } from '@/components/ui/PnlBadge'
 import { DteBar } from '@/components/ui/DteBar'
-import { calcUnrealizedPnl } from '@/lib/calculations'
+import { calcUnrealizedPnl, calcCapitalSecured } from '@/lib/calculations'
 import type { Trade, TradePanelMode } from '@/types'
 
 interface Props {
@@ -23,6 +23,8 @@ export function PositionRow({ trade, livePrice, onAction }: Props) {
           livePrice
         )
       : null
+
+  const capital = calcCapitalSecured(trade.strike_price, trade.contracts)
 
   return (
     <tr className="border-b border-border hover:bg-bg-hover transition-colors group">
@@ -52,11 +54,29 @@ export function PositionRow({ trade, livePrice, onAction }: Props) {
           <span className="text-text-muted text-sm">—</span>
         )}
       </td>
+      <td className="py-3 px-4 text-sm tabular-nums text-text-muted">
+        ${capital.toLocaleString('en-AU')}
+      </td>
+      <td className="py-3 px-4">
+        {trade.delta !== null && trade.delta !== undefined ? (
+          <span className="text-sm tabular-nums text-accent-purple">{trade.delta.toFixed(2)}</span>
+        ) : (
+          <span className="text-text-muted text-sm">—</span>
+        )}
+      </td>
+      <td className="py-3 px-4">
+        {trade.iv !== null && trade.iv !== undefined ? (
+          <span className="text-sm tabular-nums text-accent-amber">{trade.iv.toFixed(1)}%</span>
+        ) : (
+          <span className="text-text-muted text-sm">—</span>
+        )}
+      </td>
       <td className="py-3 px-4">
         <DteBar dateOpened={trade.date_opened} expiryDate={trade.expiry_date} />
       </td>
       <td className="py-3 px-4">
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <ActionButton onClick={() => onAction(trade, 'edit')} label="Edit" />
           <ActionButton onClick={() => onAction(trade, 'close')} label="Close" />
           <ActionButton onClick={() => onAction(trade, 'assign')} label="Assign" />
           <ActionButton onClick={() => onAction(trade, 'roll')} label="Roll" />

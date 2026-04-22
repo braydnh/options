@@ -1,30 +1,55 @@
 'use client'
 
 import { useState } from 'react'
-import { insertTrade } from '@/lib/supabase'
+import { insertTrade, updateTrade } from '@/lib/supabase'
 import type { Trade, NewTradeInput, TradeStrategy } from '@/types'
 
 interface Props {
   openTrades: Trade[]
   onSuccess: () => void
   onCancel: () => void
+  initialTrade?: Trade
 }
 
-const defaultForm: NewTradeInput = {
-  date_opened: new Date().toISOString().split('T')[0],
-  ticker: '',
-  strategy: 'cash_secured_put',
-  strike_price: 0,
-  contracts: 1,
-  expiry_date: '',
-  premium_in: 0,
-  brokerage_fees: 0,
-  notes: '',
-  linked_trade_id: null,
+function makeDefault(): NewTradeInput {
+  return {
+    date_opened: new Date().toISOString().split('T')[0],
+    ticker: '',
+    strategy: 'cash_secured_put',
+    strike_price: 0,
+    contracts: 1,
+    expiry_date: '',
+    premium_in: 0,
+    brokerage_fees: 0,
+    notes: '',
+    linked_trade_id: null,
+    delta: null,
+    iv: null,
+  }
 }
 
-export function TradePanelForm({ openTrades, onSuccess, onCancel }: Props) {
-  const [form, setForm] = useState<NewTradeInput>(defaultForm)
+function tradeToForm(trade: Trade): NewTradeInput {
+  return {
+    date_opened: trade.date_opened,
+    ticker: trade.ticker,
+    strategy: trade.strategy,
+    strike_price: trade.strike_price,
+    contracts: trade.contracts,
+    expiry_date: trade.expiry_date,
+    premium_in: trade.premium_in,
+    brokerage_fees: trade.brokerage_fees,
+    notes: trade.notes ?? '',
+    linked_trade_id: trade.linked_trade_id,
+    delta: trade.delta,
+    iv: trade.iv,
+  }
+}
+
+export function TradePanelForm({ openTrades, onSuccess, onCancel, initialTrade }: Props) {
+  const isEdit = !!initialTrade
+  const [form, setForm] = useState<NewTradeInput>(
+    initialTrade ? tradeToForm(initialTrade) : makeDefault()
+  )
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -36,20 +61,28 @@ export function TradePanelForm({ openTrades, onSuccess, onCancel }: Props) {
     setSubmitting(true)
     setError(null)
     try {
-      await insertTrade({
-        ...form,
-        ticker: form.ticker.toUpperCase(),
-        trade_type: form.strategy === 'cash_secured_put' ? 'put' : 'call',
-        opening_action: 'sell_to_open',
-        closing_action: null,
-        date_closed: null,
-        status: 'open',
-        assignment_status: null,
-        shares: null,
-        cost_basis: null,
-        premium_out: 0,
-      })
-      setForm(defaultForm)
+      if (isEdit) {
+        await updateTrade(initialTrade.id, {
+          ...form,
+          ticker: form.ticker.toUpperCase(),
+          trade_type: form.strategy === 'cash_secured_put' ? 'put' : 'call',
+        })
+      } else {
+        await insertTrade({
+          ...form,
+          ticker: form.ticker.toUpperCase(),
+          trade_type: form.strategy === 'cash_secured_put' ? 'put' : 'call',
+          opening_action: 'sell_to_open',
+          closing_action: null,
+          date_closed: null,
+          status: 'open',
+          assignment_status: null,
+          shares: null,
+          cost_basis: null,
+          premium_out: 0,
+        })
+        setForm(makeDefault())
+      }
       onSuccess()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save trade')
@@ -143,6 +176,33 @@ export function TradePanelForm({ openTrades, onSuccess, onCancel }: Props) {
         </Field>
       </div>
 
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="DELTA (OPTIONAL)">
+          <input
+            type="number"
+            step="0.001"
+            min={-1}
+            max={1}
+            value={form.delta ?? ''}
+            onChange={(e) => set('delta', e.target.value ? parseFloat(e.target.value) : null)}
+            placeholder="-0.30"
+            className={inputCls}
+          />
+        </Field>
+        <Field label="IV% (OPTIONAL)">
+          <input
+            type="number"
+            step="0.1"
+            min={0}
+            max={999}
+            value={form.iv ?? ''}
+            onChange={(e) => set('iv', e.target.value ? parseFloat(e.target.value) : null)}
+            placeholder="35.0"
+            className={inputCls}
+          />
+        </Field>
+      </div>
+
       <Field label="DATE OPENED">
         <input
           required
@@ -194,7 +254,7 @@ export function TradePanelForm({ openTrades, onSuccess, onCancel }: Props) {
           disabled={submitting}
           className="flex-1 py-2 rounded-md bg-accent-purple hover:bg-accent-purple/80 text-white text-sm font-medium transition-colors disabled:opacity-50"
         >
-          {submitting ? 'Saving...' : 'Log Trade'}
+          {submitting ? 'Saving...' : isEdit ? 'Save Changes' : 'Log Trade'}
         </button>
       </div>
     </form>

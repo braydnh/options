@@ -1,5 +1,5 @@
 import { PnlBadge } from '@/components/ui/PnlBadge'
-import { calcNetPremium } from '@/lib/calculations'
+import { calcNetPremium, calcCapitalSecured } from '@/lib/calculations'
 import type { Trade } from '@/types'
 
 interface Props {
@@ -12,6 +12,11 @@ export function StatsRow({ trades, openTrades }: Props) {
 
   const totalPnl = closedTrades.reduce(
     (sum, t) => sum + calcNetPremium(t.premium_in, t.premium_out, t.brokerage_fees),
+    0
+  )
+
+  const totalCapital = openTrades.reduce(
+    (sum, t) => sum + calcCapitalSecured(t.strike_price, t.contracts),
     0
   )
 
@@ -33,6 +38,14 @@ export function StatsRow({ trades, openTrades }: Props) {
 
   const stats = [
     { label: 'TOTAL P&L', value: <PnlBadge value={Math.round(totalPnl)} className="text-xl" /> },
+    {
+      label: 'CAPITAL ALLOCATED',
+      value: (
+        <span className="text-white text-xl font-semibold">
+          ${totalCapital.toLocaleString('en-AU')}
+        </span>
+      ),
+    },
     { label: 'OPEN POSITIONS', value: <span className="text-white text-xl font-semibold">{openTrades.length}</span> },
     {
       label: 'WIN RATE',
@@ -46,7 +59,7 @@ export function StatsRow({ trades, openTrades }: Props) {
   ]
 
   return (
-    <div className="grid grid-cols-4 gap-4 mb-8">
+    <div className="grid grid-cols-5 gap-4 mb-8">
       {stats.map(({ label, value }) => (
         <div key={label} className="bg-bg-panel border border-border rounded-lg p-4">
           <p className="text-[10px] tracking-widest text-text-muted uppercase mb-2">{label}</p>
