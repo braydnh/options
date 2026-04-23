@@ -29,7 +29,7 @@ export function PositionsPreview({ openTrades, prices }: Props) {
         <table className="w-full">
           <thead>
             <tr className="border-b border-border">
-              {['Ticker', 'Type', 'Strike', 'Live Price', 'Premium', 'Unreal. P&L', 'DTE'].map((h) => (
+              {['Ticker', 'Type', 'Opened', 'Strike', 'Live Price', 'Premium', 'Unreal. P&L', 'DTE'].map((h) => (
                 <th key={h} className="py-2 px-5 text-left text-[10px] tracking-widest text-text-muted uppercase font-normal">
                   {h}
                 </th>
@@ -51,6 +51,9 @@ export function PositionsPreview({ openTrades, prices }: Props) {
                 <tr key={t.id} className="border-b border-border last:border-0">
                   <td className="py-2.5 px-5 text-sm font-semibold text-white">{t.ticker}</td>
                   <td className="py-2.5 px-5"><StrategyBadge strategy={t.strategy} /></td>
+                  <td className="py-2.5 px-5 text-sm tabular-nums text-text-muted">
+                    {new Date(t.date_opened).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: '2-digit' })}
+                  </td>
                   <td className="py-2.5 px-5 text-sm tabular-nums">${t.strike_price.toFixed(2)}</td>
                   <td className="py-2.5 px-5 text-sm tabular-nums">
                     {livePrice !== undefined
