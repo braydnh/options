@@ -71,6 +71,7 @@ export function TradePanel({
           )}
           {mode === 'edit' && trade && (
             <TradePanelForm
+              key={trade.id}
               openTrades={openTrades.filter((t) => t.id !== trade.id)}
               initialTrade={trade}
               onSuccess={() => { onSuccess(); onClose() }}
