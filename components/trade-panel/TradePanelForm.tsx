@@ -25,6 +25,7 @@ function makeDefault(): NewTradeInput {
     linked_trade_id: null,
     delta: null,
     iv: null,
+    underlying_price_at_open: null,
   }
 }
 
@@ -42,6 +43,7 @@ function tradeToForm(trade: Trade): NewTradeInput {
     linked_trade_id: trade.linked_trade_id,
     delta: trade.delta,
     iv: trade.iv,
+    underlying_price_at_open: trade.underlying_price_at_open,
   }
 }
 
@@ -80,6 +82,7 @@ export function TradePanelForm({ openTrades, onSuccess, onCancel, initialTrade }
           shares: null,
           cost_basis: null,
           premium_out: 0,
+          underlying_price_at_close: null,
         })
         setForm(makeDefault())
       }
@@ -202,6 +205,18 @@ export function TradePanelForm({ openTrades, onSuccess, onCancel, initialTrade }
           />
         </Field>
       </div>
+
+      <Field label="STOCK PRICE AT ENTRY (OPTIONAL)">
+        <input
+          type="number"
+          step="0.01"
+          min={0}
+          value={form.underlying_price_at_open ?? ''}
+          onChange={(e) => set('underlying_price_at_open', e.target.value ? parseFloat(e.target.value) : null)}
+          placeholder="172.40"
+          className={inputCls}
+        />
+      </Field>
 
       <Field label="DATE OPENED">
         <input

@@ -26,6 +26,8 @@ export interface Trade {
   notes: string | null
   delta: number | null
   iv: number | null
+  underlying_price_at_open: number | null
+  underlying_price_at_close: number | null
 }
 
 export interface NewTradeInput {
@@ -41,6 +43,7 @@ export interface NewTradeInput {
   linked_trade_id: string | null
   delta: number | null
   iv: number | null
+  underlying_price_at_open: number | null
 }
 
 export interface CloseTradeInput {

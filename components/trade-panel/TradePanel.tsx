@@ -105,6 +105,7 @@ interface CloseAssignFormProps {
 function CloseAssignForm({ mode, trade, onSuccess, onCancel }: CloseAssignFormProps) {
   const [premiumOut, setPremiumOut] = useState('')
   const [dateClosed, setDateClosed] = useState(new Date().toISOString().split('T')[0])
+  const [underlyingPriceAtClose, setUnderlyingPriceAtClose] = useState('')
   const [shares, setShares] = useState(String(trade.contracts * 100))
   const [costBasis, setCostBasis] = useState(String(trade.strike_price))
   const [submitting, setSubmitting] = useState(false)
@@ -128,6 +129,7 @@ function CloseAssignForm({ mode, trade, onSuccess, onCancel }: CloseAssignFormPr
         premium_out: parseFloat(premiumOut) || 0,
         date_closed: dateClosed,
         closing_action: 'buy_to_close',
+        underlying_price_at_close: underlyingPriceAtClose ? parseFloat(underlyingPriceAtClose) : null,
       })
       onSuccess()
     } catch (err) {
@@ -190,6 +192,8 @@ function CloseAssignForm({ mode, trade, onSuccess, onCancel }: CloseAssignFormPr
         date_closed: null,
         delta: null,
         iv: null,
+        underlying_price_at_open: null,
+        underlying_price_at_close: null,
       })
       onSuccess()
     } catch (err) {
@@ -242,6 +246,17 @@ function CloseAssignForm({ mode, trade, onSuccess, onCancel }: CloseAssignFormPr
             value={premiumOut}
             onChange={(e) => setPremiumOut(e.target.value)}
             placeholder="0.00 (expired worthless)"
+            className={inputCls}
+          />
+        </Field>
+        <Field label="STOCK PRICE AT CLOSE (OPTIONAL)">
+          <input
+            type="number"
+            step="0.01"
+            min={0}
+            value={underlyingPriceAtClose}
+            onChange={(e) => setUnderlyingPriceAtClose(e.target.value)}
+            placeholder="172.40"
             className={inputCls}
           />
         </Field>

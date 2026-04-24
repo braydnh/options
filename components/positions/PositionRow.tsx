@@ -3,7 +3,7 @@
 import { StrategyBadge } from '@/components/ui/StrategyBadge'
 import { PnlBadge } from '@/components/ui/PnlBadge'
 import { DteBar } from '@/components/ui/DteBar'
-import { calcUnrealizedPnl, calcCapitalSecured } from '@/lib/calculations'
+import { calcUnrealizedPnl, calcCapitalSecured, calcBuyHoldReturn } from '@/lib/calculations'
 import type { Trade, TradePanelMode } from '@/types'
 
 interface Props {
@@ -27,6 +27,10 @@ export function PositionRow({ trade, livePrice, onAction }: Props) {
   const capital = calcCapitalSecured(trade.strike_price, trade.contracts)
   const unrealizedPct = unrealizedPnl !== null && capital > 0
     ? (unrealizedPnl / capital) * 100
+    : null
+
+  const bah = trade.underlying_price_at_open !== null && livePrice !== undefined
+    ? calcBuyHoldReturn(trade.underlying_price_at_open, livePrice, trade.contracts)
     : null
 
   return (
@@ -65,6 +69,20 @@ export function PositionRow({ trade, livePrice, onAction }: Props) {
           </div>
         ) : (
           <span className="text-text-muted text-sm">—</span>
+        )}
+      </td>
+      <td className="py-3 px-4">
+        {bah !== null ? (
+          <div className="flex flex-col gap-0.5">
+            <span className={`text-sm font-medium tabular-nums ${bah.dollars >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+              {bah.dollars >= 0 ? '+' : ''}${Math.round(bah.dollars)}
+            </span>
+            <span className={`text-[10px] tabular-nums ${bah.pct >= 0 ? 'text-accent-green/70' : 'text-accent-red/70'}`}>
+              {bah.pct >= 0 ? '+' : ''}{bah.pct.toFixed(2)}%
+            </span>
+          </div>
+        ) : (
+          <span className="text-text-dim text-xs">no entry price</span>
         )}
       </td>
       <td className="py-3 px-4 text-sm tabular-nums text-text-muted">

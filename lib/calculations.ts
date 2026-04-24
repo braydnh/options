@@ -59,6 +59,17 @@ export function dteFillPercent(dateOpened: string, expiryDate: string): number {
   return Math.min(100, Math.max(0, ((now - opened) / total) * 100))
 }
 
+export function calcBuyHoldReturn(
+  underlyingAtOpen: number,
+  underlyingAtClose: number,
+  contracts: number
+): { dollars: number; pct: number } {
+  const shares = contracts * 100
+  const dollars = (underlyingAtClose - underlyingAtOpen) * shares
+  const pct = ((underlyingAtClose - underlyingAtOpen) / underlyingAtOpen) * 100
+  return { dollars, pct }
+}
+
 export function calcCumulativePnl(
   closedTrades: Trade[]
 ): { date: string; cumPnl: number }[] {

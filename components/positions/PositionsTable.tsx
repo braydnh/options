@@ -9,7 +9,7 @@ interface Props {
   onAction: (trade: Trade, mode: TradePanelMode) => void
 }
 
-const HEADERS = ['Ticker', 'Type', 'Opened', 'Strike', 'Live Price', 'Premium In', 'Unreal. P&L', 'Capital', 'Delta', 'IV%', 'DTE', 'Actions']
+const HEADERS = ['Ticker', 'Type', 'Opened', 'Strike', 'Live Price', 'Premium In', 'Unreal. P&L', 'vs B&H', 'Capital', 'Delta', 'IV%', 'DTE', 'Actions']
 
 export function PositionsTable({ trades, prices, onAction }: Props) {
   if (trades.length === 0) {

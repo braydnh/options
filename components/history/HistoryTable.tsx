@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { StrategyBadge } from '@/components/ui/StrategyBadge'
 import { PnlBadge } from '@/components/ui/PnlBadge'
-import { calcNetPremium, calcReturnOnCapital, calcCapitalSecured } from '@/lib/calculations'
+import { calcNetPremium, calcReturnOnCapital, calcCapitalSecured, calcBuyHoldReturn } from '@/lib/calculations'
 import type { Trade, TradePanelMode } from '@/types'
 
 interface Props {
@@ -57,7 +57,7 @@ export function HistoryTable({ trades, onAction }: Props) {
         <table className="w-full">
           <thead>
             <tr className="border-b border-border">
-              {['Ticker', 'Type', 'Strike', 'Expiry', 'Contracts', 'Premium In', 'Buyback', 'Net P&L', 'ROC%', 'Delta', 'IV%', 'Outcome', 'Closed', ''].map((h) => (
+              {['Ticker', 'Type', 'Strike', 'Expiry', 'Contracts', 'Premium In', 'Buyback', 'Net P&L', 'ROC%', 'B&H Return', 'vs Options', 'Delta', 'IV%', 'Outcome', 'Closed', ''].map((h) => (
                 <th key={h} className="py-2 px-4 text-left text-[10px] tracking-widest text-text-muted uppercase font-normal whitespace-nowrap">
                   {h}
                 </th>
@@ -70,6 +70,10 @@ export function HistoryTable({ trades, onAction }: Props) {
               const cap = calcCapitalSecured(t.strike_price, t.contracts)
               const roc = calcReturnOnCapital(net, cap)
               const isLinked = !!t.linked_trade_id
+              const bah = t.underlying_price_at_open !== null && t.underlying_price_at_close !== null
+                ? calcBuyHoldReturn(t.underlying_price_at_open, t.underlying_price_at_close, t.contracts)
+                : null
+              const advantage = bah !== null ? net - bah.dollars : null
 
               return (
                 <tr
@@ -91,6 +95,34 @@ export function HistoryTable({ trades, onAction }: Props) {
                   <td className="py-2.5 px-4"><PnlBadge value={Math.round(net)} /></td>
                   <td className="py-2.5 px-4 text-sm tabular-nums text-accent-purple">
                     {(roc * 100).toFixed(2)}%
+                  </td>
+                  <td className="py-2.5 px-4">
+                    {bah !== null ? (
+                      <div className="flex flex-col gap-0.5">
+                        <span className={`text-sm tabular-nums font-medium ${bah.dollars >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                          {bah.dollars >= 0 ? '+' : ''}${Math.round(bah.dollars)}
+                        </span>
+                        <span className={`text-[10px] tabular-nums ${bah.pct >= 0 ? 'text-accent-green/70' : 'text-accent-red/70'}`}>
+                          {bah.pct >= 0 ? '+' : ''}{bah.pct.toFixed(2)}%
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-text-muted text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="py-2.5 px-4">
+                    {advantage !== null ? (
+                      <div className="flex flex-col gap-0.5">
+                        <span className={`text-sm tabular-nums font-medium ${advantage >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                          {advantage >= 0 ? '+' : ''}${Math.round(advantage)}
+                        </span>
+                        <span className={`text-[10px] ${advantage >= 0 ? 'text-accent-green/70' : 'text-accent-red/70'}`}>
+                          {advantage >= 0 ? 'options won' : 'B&H won'}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-text-muted text-xs">—</span>
+                    )}
                   </td>
                   <td className="py-2.5 px-4 text-sm tabular-nums text-accent-purple">
                     {t.delta !== null && t.delta !== undefined ? t.delta.toFixed(2) : '—'}
