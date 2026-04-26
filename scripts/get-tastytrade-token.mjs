@@ -75,13 +75,20 @@ async function main() {
       const msg = sessionData?.error?.message ?? 'Session failed'
       if (msg.toLowerCase().includes('challenge') || msg.toLowerCase().includes('device')) {
         console.log(' device challenge required.')
-        const otp = await ask('Enter the OTP code from your email/SMS/app: ')
+        console.log('\nFull response from tastytrade:')
+        console.log(JSON.stringify(sessionData, null, 2))
+        console.log()
+        const otp = await ask('Enter the OTP code (check tastytrade app, email, SMS): ')
         const res2 = await fetch(`${BASE_URL}/sessions`, {
           method: 'POST', headers: HEADERS,
           body: JSON.stringify({ ...body, 'one-time-password': otp }),
         })
         sessionData = await safeJson(res2, '/sessions (otp)')
-        if (!res2.ok) throw new Error(sessionData?.error?.message ?? 'OTP session failed')
+        if (!res2.ok) {
+          console.log('\nOTP response:')
+          console.log(JSON.stringify(sessionData, null, 2))
+          throw new Error(sessionData?.error?.message ?? 'OTP session failed')
+        }
       } else {
         throw new Error(msg)
       }
