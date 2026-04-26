@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { useTastytradeClient } from '@/hooks/useTastytradeClient'
 import { insertTrade } from '@/lib/supabase'
@@ -20,13 +21,19 @@ interface ParsedTrade {
 }
 
 export default function SettingsPage() {
-  const { client, config, loading } = useTastytradeClient()
+  return (
+    <Suspense>
+      <SettingsContent />
+    </Suspense>
+  )
+}
 
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [connecting, setConnecting] = useState(false)
-  const [connectError, setConnectError] = useState<string | null>(null)
-  const [connectSuccess, setConnectSuccess] = useState(false)
+function SettingsContent() {
+  const { client, config, loading } = useTastytradeClient()
+  const searchParams = useSearchParams()
+
+  const [callbackError, setCallbackError] = useState<string | null>(null)
+  const [callbackSuccess, setCallbackSuccess] = useState(false)
 
   const [syncing, setSyncing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
@@ -37,33 +44,17 @@ export default function SettingsPage() {
 
   const isConnected = !loading && !!client
 
-  async function handleConnect(e: React.FormEvent) {
-    e.preventDefault()
-    setConnecting(true)
-    setConnectError(null)
-    setConnectSuccess(false)
-    try {
-      const res = await fetch('/api/tastytrade/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      })
-      const text = await res.text()
-      let data: any = {}
-      try { data = JSON.parse(text) } catch {
-        throw new Error(`Server error (${res.status}). Try again — the deployment may still be warming up.`)
-      }
-      if (!res.ok) throw new Error(data.error ?? 'Connection failed')
-      setConnectSuccess(true)
-      setUsername('')
-      setPassword('')
+  useEffect(() => {
+    const err = searchParams.get('error')
+    const connected = searchParams.get('connected')
+    if (err) setCallbackError(decodeURIComponent(err))
+    if (connected === 'true') {
+      setCallbackSuccess(true)
+      // Reload to pick up the new client singleton
+      window.history.replaceState({}, '', '/settings')
       window.location.reload()
-    } catch (err) {
-      setConnectError(err instanceof Error ? err.message : 'Failed to connect')
-    } finally {
-      setConnecting(false)
     }
-  }
+  }, [searchParams])
 
   async function handleSync() {
     setSyncing(true)
@@ -121,9 +112,7 @@ export default function SettingsPage() {
           underlying_price_at_close: null,
         })
         count++
-      } catch {
-        // Continue importing others if one fails
-      }
+      } catch { /* continue */ }
     }
     setImporting(false)
     setImportResult(`${count} of ${toImport.length} trade${toImport.length !== 1 ? 's' : ''} imported.`)
@@ -159,48 +148,28 @@ export default function SettingsPage() {
             )}
           </div>
 
-          {!isConnected && (
-            <form onSubmit={handleConnect} className="flex flex-col gap-4">
-              <p className="text-text-muted text-sm">
-                Enter your tastytrade credentials to connect. Your password is sent once to obtain a long-lived refresh token and is never stored.
-              </p>
-              <div>
-                <label className="block text-[10px] tracking-widest text-text-muted mb-1.5 uppercase">Username / Email</label>
-                <input
-                  required
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className={inputCls}
-                  autoComplete="username"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] tracking-widest text-text-muted mb-1.5 uppercase">Password</label>
-                <input
-                  required
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={inputCls}
-                  autoComplete="current-password"
-                />
-              </div>
-              {connectError && <p className="text-red-400 text-sm">{connectError}</p>}
-              {connectSuccess && <p className="text-green-400 text-sm">Connected successfully! Reloading...</p>}
-              <button
-                type="submit"
-                disabled={connecting}
-                className="py-2 px-4 bg-accent-purple hover:bg-accent-purple/80 text-white text-sm font-medium rounded-md transition-colors disabled:opacity-50"
-              >
-                {connecting ? 'Connecting...' : 'Connect'}
-              </button>
-            </form>
+          {callbackError && (
+            <p className="text-red-400 text-sm mb-4">Connection failed: {callbackError}</p>
+          )}
+          {callbackSuccess && (
+            <p className="text-green-400 text-sm mb-4">Connected successfully!</p>
           )}
 
-          {isConnected && (
+          {!isConnected ? (
+            <div className="flex flex-col gap-3">
+              <p className="text-text-muted text-sm">
+                Click below to log in with tastytrade. You&apos;ll be redirected to their site and back — we never see your password.
+              </p>
+              <a
+                href="/api/tastytrade/authorize"
+                className="inline-flex items-center justify-center py-2 px-4 bg-accent-purple hover:bg-accent-purple/80 text-white text-sm font-medium rounded-md transition-colors"
+              >
+                Connect with tastytrade →
+              </a>
+            </div>
+          ) : (
             <p className="text-text-muted text-sm">
-              Live quotes from tastytrade are active. To reconnect with different credentials, re-enter your details above.
+              Live quotes from tastytrade are active on positions and dashboard.
             </p>
           )}
         </section>
@@ -305,6 +274,3 @@ export default function SettingsPage() {
     </div>
   )
 }
-
-const inputCls =
-  'w-full bg-bg-base border border-border rounded-md px-3 py-2 text-sm text-white placeholder-text-dim focus:outline-none focus:border-accent-purple/60 transition-colors'
