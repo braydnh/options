@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useTastytradeClient } from '@/hooks/useTastytradeClient'
 
 interface SidebarProps {
   onAddTrade: () => void
@@ -16,6 +17,8 @@ const NAV_ITEMS = [
 
 export function Sidebar({ onAddTrade }: SidebarProps) {
   const pathname = usePathname()
+  const { client, loading } = useTastytradeClient()
+  const connected = !loading && !!client
 
   return (
     <aside className="w-52 h-screen bg-bg-panel border-r border-border flex flex-col fixed left-0 top-0 z-10">
@@ -46,6 +49,29 @@ export function Sidebar({ onAddTrade }: SidebarProps) {
           )
         })}
       </nav>
+
+      {/* Settings link */}
+      <div className="px-3 pb-2">
+        <Link
+          href="/settings"
+          className={`
+            flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors
+            ${pathname === '/settings'
+              ? 'bg-bg-hover text-white'
+              : 'text-text-muted hover:text-white hover:bg-bg-hover'
+            }
+          `}
+        >
+          <span className="flex items-center gap-3">
+            <span className="text-base">⚙</span>
+            Settings
+          </span>
+          <span
+            title={connected ? 'tastytrade connected' : 'tastytrade not connected'}
+            className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-400' : 'bg-text-dim'}`}
+          />
+        </Link>
+      </div>
 
       {/* Add Trade button */}
       <div className="px-3 pb-5">
