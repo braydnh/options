@@ -32,6 +32,8 @@ function SettingsContent() {
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [otp, setOtp] = useState('')
+  const [challengeRequired, setChallengeRequired] = useState(false)
   const [connecting, setConnecting] = useState(false)
   const [connectError, setConnectError] = useState<string | null>(null)
   const [connectSuccess, setConnectSuccess] = useState(false)
@@ -55,10 +57,13 @@ function SettingsContent() {
       const { clientId } = await fetch('/api/tastytrade/client-id').then((r) => r.json())
 
       // Step 1: Session — done from the browser so tastytrade sees the user's own IP
+      const sessionBody: Record<string, unknown> = { login: username, password }
+      if (otp) sessionBody['one-time-password'] = otp
+
       const sessionRes = await fetch('https://api.tastyworks.com/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ login: username, password }),
+        body: JSON.stringify(sessionBody),
       })
       const sessionText = await sessionRes.text()
       let sessionData: any = {}
@@ -66,7 +71,13 @@ function SettingsContent() {
         throw new Error('tastytrade returned an unexpected response')
       }
       if (!sessionRes.ok) {
-        throw new Error(sessionData?.error?.message ?? 'Invalid credentials')
+        const msg: string = sessionData?.error?.message ?? 'Invalid credentials'
+        if (msg.toLowerCase().includes('challenge') || msg.toLowerCase().includes('device')) {
+          setChallengeRequired(true)
+          setConnectError('Check your email, SMS, or tastytrade app for a verification code.')
+          return
+        }
+        throw new Error(msg)
       }
       const sessionToken: string = sessionData?.data?.['session-token']
       if (!sessionToken) throw new Error('No session token returned')
@@ -96,6 +107,8 @@ function SettingsContent() {
       setConnectSuccess(true)
       setUsername('')
       setPassword('')
+      setOtp('')
+      setChallengeRequired(false)
       window.location.reload()
     } catch (err) {
       setConnectError(err instanceof Error ? err.message : 'Failed to connect')
@@ -223,6 +236,22 @@ function SettingsContent() {
                   autoComplete="current-password"
                 />
               </div>
+              {challengeRequired && (
+                <div>
+                  <label className="block text-[10px] tracking-widest text-text-muted mb-1.5 uppercase">Verification Code</label>
+                  <input
+                    required
+                    type="text"
+                    inputMode="numeric"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    placeholder="6-digit code"
+                    className={inputCls}
+                    autoComplete="one-time-code"
+                    autoFocus
+                  />
+                </div>
+              )}
               {connectError && <p className="text-red-400 text-sm">{connectError}</p>}
               {connectSuccess && <p className="text-green-400 text-sm">Connected! Reloading...</p>}
               <button
@@ -230,7 +259,7 @@ function SettingsContent() {
                 disabled={connecting}
                 className="py-2 px-4 bg-accent-purple hover:bg-accent-purple/80 text-white text-sm font-medium rounded-md transition-colors disabled:opacity-50"
               >
-                {connecting ? 'Connecting...' : 'Connect'}
+                {connecting ? 'Connecting...' : challengeRequired ? 'Verify & Connect' : 'Connect'}
               </button>
             </form>
           )}
