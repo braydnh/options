@@ -30,13 +30,10 @@ export default function SettingsPage() {
 function SettingsContent() {
   const { client, config, loading } = useTastytradeClient()
 
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [otp, setOtp] = useState('')
-  const [challengeRequired, setChallengeRequired] = useState(false)
-  const [connecting, setConnecting] = useState(false)
-  const [connectError, setConnectError] = useState<string | null>(null)
-  const [connectSuccess, setConnectSuccess] = useState(false)
+  const [refreshToken, setRefreshToken] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveSuccess, setSaveSuccess] = useState(false)
 
   const [syncing, setSyncing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
@@ -47,73 +44,26 @@ function SettingsContent() {
 
   const isConnected = !loading && !!client
 
-  async function handleConnect(e: React.FormEvent) {
+  async function handleSaveToken(e: React.FormEvent) {
     e.preventDefault()
-    setConnecting(true)
-    setConnectError(null)
-    setConnectSuccess(false)
+    setSaving(true)
+    setSaveError(null)
+    setSaveSuccess(false)
     try {
-      // Fetch client ID (not secret) from our server
-      const { clientId } = await fetch('/api/tastytrade/client-id').then((r) => r.json())
-
-      // Step 1: Session — done from the browser so tastytrade sees the user's own IP
-      const sessionBody: Record<string, unknown> = { login: username, password }
-      if (otp) sessionBody['one-time-password'] = otp
-
-      const sessionRes = await fetch('https://api.tastyworks.com/sessions', {
+      const res = await fetch('/api/tastytrade/save-token', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(sessionBody),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
       })
-      const sessionText = await sessionRes.text()
-      let sessionData: any = {}
-      try { sessionData = JSON.parse(sessionText) } catch {
-        throw new Error('tastytrade returned an unexpected response')
-      }
-      if (!sessionRes.ok) {
-        const msg: string = sessionData?.error?.message ?? 'Invalid credentials'
-        if (msg.toLowerCase().includes('challenge') || msg.toLowerCase().includes('device')) {
-          setChallengeRequired(true)
-          setConnectError('Check your email, SMS, or tastytrade app for a verification code.')
-          return
-        }
-        throw new Error(msg)
-      }
-      const sessionToken: string = sessionData?.data?.['session-token']
-      if (!sessionToken) throw new Error('No session token returned')
-
-      // Step 2: OAuth authorize — done from the browser, follows redirect to our callback
-      const redirectUri = `${window.location.origin}/api/auth/callback`
-      const authorizeRes = await fetch('https://api.tastyworks.com/oauth/authorize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': sessionToken,
-        },
-        body: JSON.stringify({
-          'client-id': clientId,
-          'redirect-uri': redirectUri,
-          'response-type': 'code',
-          scope: 'read openid',
-        }),
-        redirect: 'follow',
-      })
-
-      // Our callback returns JSON { success, accountNumber } or { error }
-      const result = await authorizeRes.json().catch(() => ({ error: `OAuth failed (${authorizeRes.status})` }))
-      if (result.error) throw new Error(result.error)
-
-      setConnectSuccess(true)
-      setUsername('')
-      setPassword('')
-      setOtp('')
-      setChallengeRequired(false)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Failed to save token')
+      setSaveSuccess(true)
+      setRefreshToken('')
       window.location.reload()
     } catch (err) {
-      setConnectError(err instanceof Error ? err.message : 'Failed to connect')
+      setSaveError(err instanceof Error ? err.message : 'Failed to save token')
     } finally {
-      setConnecting(false)
+      setSaving(false)
     }
   }
 
@@ -210,56 +160,34 @@ function SettingsContent() {
           </div>
 
           {!isConnected && (
-            <form onSubmit={handleConnect} className="flex flex-col gap-4">
-              <p className="text-text-muted text-sm">
-                Enter your tastytrade credentials to connect. Your password is sent once to obtain a long-lived refresh token and is never stored.
-              </p>
-              <div>
-                <label className="block text-[10px] tracking-widest text-text-muted mb-1.5 uppercase">Username / Email</label>
-                <input
-                  required
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className={inputCls}
-                  autoComplete="username"
-                />
+            <form onSubmit={handleSaveToken} className="flex flex-col gap-4">
+              <div className="bg-bg-base border border-border rounded-md px-4 py-3 text-sm text-text-muted leading-relaxed">
+                <p className="text-white font-medium mb-1">One-time setup</p>
+                <p>Run this in your terminal from the project folder:</p>
+                <code className="block mt-2 text-xs bg-black/40 rounded px-3 py-2 text-green-400 select-all">
+                  node scripts/get-tastytrade-token.mjs
+                </code>
+                <p className="mt-2">It logs into tastytrade from your local machine (trusted IP), prints a refresh token, then paste it below.</p>
               </div>
               <div>
-                <label className="block text-[10px] tracking-widest text-text-muted mb-1.5 uppercase">Password</label>
+                <label className="block text-[10px] tracking-widest text-text-muted mb-1.5 uppercase">Refresh Token</label>
                 <input
                   required
                   type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={refreshToken}
+                  onChange={(e) => setRefreshToken(e.target.value)}
+                  placeholder="Paste token from the script output"
                   className={inputCls}
-                  autoComplete="current-password"
                 />
               </div>
-              {challengeRequired && (
-                <div>
-                  <label className="block text-[10px] tracking-widest text-text-muted mb-1.5 uppercase">Verification Code</label>
-                  <input
-                    required
-                    type="text"
-                    inputMode="numeric"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
-                    placeholder="6-digit code"
-                    className={inputCls}
-                    autoComplete="one-time-code"
-                    autoFocus
-                  />
-                </div>
-              )}
-              {connectError && <p className="text-red-400 text-sm">{connectError}</p>}
-              {connectSuccess && <p className="text-green-400 text-sm">Connected! Reloading...</p>}
+              {saveError && <p className="text-red-400 text-sm">{saveError}</p>}
+              {saveSuccess && <p className="text-green-400 text-sm">Connected! Reloading...</p>}
               <button
                 type="submit"
-                disabled={connecting}
+                disabled={saving}
                 className="py-2 px-4 bg-accent-purple hover:bg-accent-purple/80 text-white text-sm font-medium rounded-md transition-colors disabled:opacity-50"
               >
-                {connecting ? 'Connecting...' : challengeRequired ? 'Verify & Connect' : 'Connect'}
+                {saving ? 'Verifying...' : 'Save Token'}
               </button>
             </form>
           )}
