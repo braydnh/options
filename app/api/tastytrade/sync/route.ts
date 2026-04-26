@@ -41,7 +41,7 @@ function parseOccSymbol(symbol: string): { ticker: string; expiry: string; type:
 async function getAccessToken(clientId: string, clientSecret: string, refreshToken: string): Promise<string | null> {
   const res = await fetch(`${BASE_URL}/oauth/token`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': 'tastytrade-sdk-js' },
     body: JSON.stringify({
       'grant-type': 'refresh_token',
       'refresh-token': refreshToken,

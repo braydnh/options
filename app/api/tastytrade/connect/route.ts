@@ -8,7 +8,11 @@ const REDIRECT_URI = process.env.NEXT_PUBLIC_TASTYTRADE_REDIRECT_URI ?? 'https:/
 
 // One-time setup: exchange tastytrade credentials for a refresh token
 // and store it in Supabase settings.
-const JSON_HEADERS = { 'Content-Type': 'application/json', 'Accept': 'application/json' }
+const JSON_HEADERS = {
+  'Content-Type': 'application/json',
+  'Accept': 'application/json',
+  'User-Agent': 'tastytrade-sdk-js',
+}
 
 async function safeJson(res: Response, step: string): Promise<any> {
   const text = await res.text()

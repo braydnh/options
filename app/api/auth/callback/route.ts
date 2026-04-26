@@ -6,7 +6,11 @@ const CLIENT_ID = process.env.TASTYTRADE_CLIENT_ID!
 const CLIENT_SECRET = process.env.TASTYTRADE_CLIENT_SECRET!
 const REDIRECT_URI = process.env.TASTYTRADE_REDIRECT_URI ?? 'https://options-ochre.vercel.app/api/auth/callback'
 
-const JSON_HEADERS = { 'Content-Type': 'application/json', 'Accept': 'application/json' }
+const JSON_HEADERS = {
+  'Content-Type': 'application/json',
+  'Accept': 'application/json',
+  'User-Agent': 'tastytrade-sdk-js',
+}
 
 function redirectTo(req: NextRequest, path: string) {
   return NextResponse.redirect(new URL(path, req.url))
