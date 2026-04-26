@@ -48,7 +48,11 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       })
-      const data = await res.json()
+      const text = await res.text()
+      let data: any = {}
+      try { data = JSON.parse(text) } catch {
+        throw new Error(`Server error (${res.status}). Try again — the deployment may still be warming up.`)
+      }
       if (!res.ok) throw new Error(data.error ?? 'Connection failed')
       setConnectSuccess(true)
       setUsername('')
@@ -68,7 +72,11 @@ export default function SettingsPage() {
     setImportResult(null)
     try {
       const res = await fetch('/api/tastytrade/sync')
-      const data = await res.json()
+      const text = await res.text()
+      let data: any = {}
+      try { data = JSON.parse(text) } catch {
+        throw new Error(`Server error (${res.status})`)
+      }
       if (!res.ok) throw new Error(data.error ?? 'Sync failed')
       setSyncedTrades(data.trades)
       setSelected(new Set(data.trades.map((t: ParsedTrade) => t.tastytrade_order_id)))
