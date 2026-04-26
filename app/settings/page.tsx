@@ -32,8 +32,6 @@ function SettingsContent() {
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [otp, setOtp] = useState('')
-  const [challengeRequired, setChallengeRequired] = useState(false)
   const [connecting, setConnecting] = useState(false)
   const [connectError, setConnectError] = useState<string | null>(null)
   const [connectSuccess, setConnectSuccess] = useState(false)
@@ -53,27 +51,51 @@ function SettingsContent() {
     setConnectError(null)
     setConnectSuccess(false)
     try {
-      const res = await fetch('/api/tastytrade/connect', {
+      // Fetch client ID (not secret) from our server
+      const { clientId } = await fetch('/api/tastytrade/client-id').then((r) => r.json())
+
+      // Step 1: Session — done from the browser so tastytrade sees the user's own IP
+      const sessionRes = await fetch('https://api.tastyworks.com/sessions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, otp: otp || undefined }),
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ login: username, password }),
       })
-      const text = await res.text()
-      let data: any = {}
-      try { data = JSON.parse(text) } catch {
-        throw new Error(`Server error (${res.status}) — check Vercel logs`)
+      const sessionText = await sessionRes.text()
+      let sessionData: any = {}
+      try { sessionData = JSON.parse(sessionText) } catch {
+        throw new Error('tastytrade returned an unexpected response')
       }
-      if (data.challengeRequired) {
-        setChallengeRequired(true)
-        setConnectError(null)
-        return
+      if (!sessionRes.ok) {
+        throw new Error(sessionData?.error?.message ?? 'Invalid credentials')
       }
-      if (!res.ok) throw new Error(data.error ?? 'Connection failed')
+      const sessionToken: string = sessionData?.data?.['session-token']
+      if (!sessionToken) throw new Error('No session token returned')
+
+      // Step 2: OAuth authorize — done from the browser, follows redirect to our callback
+      const redirectUri = `${window.location.origin}/api/auth/callback`
+      const authorizeRes = await fetch('https://api.tastyworks.com/oauth/authorize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': sessionToken,
+        },
+        body: JSON.stringify({
+          'client-id': clientId,
+          'redirect-uri': redirectUri,
+          'response-type': 'code',
+          scope: 'read openid',
+        }),
+        redirect: 'follow',
+      })
+
+      // Our callback returns JSON { success, accountNumber } or { error }
+      const result = await authorizeRes.json().catch(() => ({ error: `OAuth failed (${authorizeRes.status})` }))
+      if (result.error) throw new Error(result.error)
+
       setConnectSuccess(true)
       setUsername('')
       setPassword('')
-      setOtp('')
-      setChallengeRequired(false)
       window.location.reload()
     } catch (err) {
       setConnectError(err instanceof Error ? err.message : 'Failed to connect')
@@ -201,26 +223,6 @@ function SettingsContent() {
                   autoComplete="current-password"
                 />
               </div>
-              {challengeRequired && (
-                <div>
-                  <label className="block text-[10px] tracking-widest text-text-muted mb-1.5 uppercase">
-                    Verification Code
-                  </label>
-                  <input
-                    required
-                    type="text"
-                    inputMode="numeric"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
-                    placeholder="Check your email or SMS"
-                    className={inputCls}
-                    autoComplete="one-time-code"
-                  />
-                  <p className="text-text-muted text-xs mt-1.5">
-                    tastytrade sent a code to your registered email or phone. Enter it above and click Connect again.
-                  </p>
-                </div>
-              )}
               {connectError && <p className="text-red-400 text-sm">{connectError}</p>}
               {connectSuccess && <p className="text-green-400 text-sm">Connected! Reloading...</p>}
               <button
@@ -228,7 +230,7 @@ function SettingsContent() {
                 disabled={connecting}
                 className="py-2 px-4 bg-accent-purple hover:bg-accent-purple/80 text-white text-sm font-medium rounded-md transition-colors disabled:opacity-50"
               >
-                {connecting ? 'Connecting...' : challengeRequired ? 'Verify & Connect' : 'Connect'}
+                {connecting ? 'Connecting...' : 'Connect'}
               </button>
             </form>
           )}
