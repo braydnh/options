@@ -8,6 +8,17 @@ const REDIRECT_URI = process.env.NEXT_PUBLIC_TASTYTRADE_REDIRECT_URI ?? 'https:/
 
 // One-time setup: exchange tastytrade credentials for a refresh token
 // and store it in Supabase settings.
+const JSON_HEADERS = { 'Content-Type': 'application/json', 'Accept': 'application/json' }
+
+async function safeJson(res: Response, step: string): Promise<any> {
+  const text = await res.text()
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error(`${step} returned non-JSON (${res.status}): ${text.slice(0, 120)}`)
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { username, password } = await req.json()
@@ -19,14 +30,14 @@ export async function POST(req: NextRequest) {
     // Step 1: Create a tastytrade session
     const sessionRes = await fetch(`${BASE_URL}/sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: JSON_HEADERS,
       body: JSON.stringify({ login: username, password, 'remember-me': false }),
     })
-    const sessionData = await sessionRes.json()
+    const sessionData = await safeJson(sessionRes, 'sessions')
 
     if (!sessionRes.ok) {
       return NextResponse.json(
-        { error: sessionData?.error?.message ?? 'Invalid tastytrade credentials' },
+        { error: sessionData?.error?.message ?? sessionData?.errors?.[0]?.detail ?? 'Invalid tastytrade credentials' },
         { status: 401 }
       )
     }
@@ -39,10 +50,7 @@ export async function POST(req: NextRequest) {
     // Step 2: Use the session to request an OAuth authorization code
     const authorizeRes = await fetch(`${BASE_URL}/oauth/authorize`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: sessionToken,
-      },
+      headers: { ...JSON_HEADERS, Authorization: sessionToken },
       body: JSON.stringify({
         'client-id': CLIENT_ID,
         'redirect-uri': REDIRECT_URI,
@@ -57,16 +65,24 @@ export async function POST(req: NextRequest) {
     // Code may come in Location header (redirect) or response body
     if (authorizeRes.status === 302 || authorizeRes.status === 301) {
       const location = authorizeRes.headers.get('location') ?? ''
-      const url = new URL(location)
-      authCode = url.searchParams.get('code')
+      try {
+        const url = new URL(location)
+        authCode = url.searchParams.get('code')
+      } catch {
+        // relative URL — extract code manually
+        authCode = new URLSearchParams(location.split('?')[1] ?? '').get('code')
+      }
     } else {
-      const authorizeData = await authorizeRes.json().catch(() => null)
-      authCode = authorizeData?.code ?? authorizeData?.data?.code ?? null
+      const authorizeBody = await authorizeRes.text()
+      try {
+        const authorizeData = JSON.parse(authorizeBody)
+        authCode = authorizeData?.code ?? authorizeData?.data?.code ?? null
+      } catch { /* not JSON */ }
     }
 
     if (!authCode) {
       return NextResponse.json(
-        { error: `OAuth authorize failed (${authorizeRes.status}). Check client ID and redirect URI.` },
+        { error: `OAuth authorize failed (${authorizeRes.status}). Verify the redirect URI in your tastytrade OAuth app matches exactly: ${REDIRECT_URI}` },
         { status: 500 }
       )
     }
@@ -74,7 +90,7 @@ export async function POST(req: NextRequest) {
     // Step 3: Exchange auth code for access + refresh tokens
     const tokenRes = await fetch(`${BASE_URL}/oauth/token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: JSON_HEADERS,
       body: JSON.stringify({
         'grant-type': 'authorization_code',
         code: authCode,
@@ -83,11 +99,11 @@ export async function POST(req: NextRequest) {
         'redirect-uri': REDIRECT_URI,
       }),
     })
-    const tokenData = await tokenRes.json()
+    const tokenData = await safeJson(tokenRes, 'oauth/token')
 
     if (!tokenRes.ok) {
       return NextResponse.json(
-        { error: tokenData?.error_description ?? 'Token exchange failed' },
+        { error: tokenData?.error_description ?? tokenData?.error ?? 'Token exchange failed' },
         { status: 500 }
       )
     }
@@ -101,9 +117,9 @@ export async function POST(req: NextRequest) {
 
     // Step 4: Fetch account number
     const accountRes = await fetch(`${BASE_URL}/customers/me/accounts`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { ...JSON_HEADERS, Authorization: `Bearer ${accessToken}` },
     })
-    const accountData = await accountRes.json()
+    const accountData = await safeJson(accountRes, 'customers/me/accounts')
     const accountNumber: string =
       accountData?.data?.items?.[0]?.account?.['account-number'] ?? ''
 
