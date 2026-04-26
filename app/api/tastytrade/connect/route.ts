@@ -25,25 +25,30 @@ async function safeJson(res: Response, step: string): Promise<any> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { username, password } = await req.json()
+    const { username, password, otp } = await req.json()
 
     if (!username || !password) {
       return NextResponse.json({ error: 'username and password required' }, { status: 400 })
     }
 
-    // Step 1: Create a tastytrade session
+    // Step 1: Create a tastytrade session (include OTP if provided)
+    const sessionBody: Record<string, unknown> = { login: username, password, 'remember-me': false }
+    if (otp) sessionBody['one-time-password'] = otp
+
     const sessionRes = await fetch(`${BASE_URL}/sessions`, {
       method: 'POST',
       headers: JSON_HEADERS,
-      body: JSON.stringify({ login: username, password, 'remember-me': false }),
+      body: JSON.stringify(sessionBody),
     })
     const sessionData = await safeJson(sessionRes, 'sessions')
 
     if (!sessionRes.ok) {
-      return NextResponse.json(
-        { error: sessionData?.error?.message ?? sessionData?.errors?.[0]?.detail ?? 'Invalid tastytrade credentials' },
-        { status: 401 }
-      )
+      const msg: string = sessionData?.error?.message ?? sessionData?.errors?.[0]?.detail ?? 'Invalid tastytrade credentials'
+      // Device challenge: tastytrade sends a code to user's email/phone
+      if (msg.toLowerCase().includes('challenge') || msg.toLowerCase().includes('device')) {
+        return NextResponse.json({ challengeRequired: true, message: msg }, { status: 200 })
+      }
+      return NextResponse.json({ error: msg }, { status: 401 })
     }
 
     const sessionToken: string = sessionData?.data?.['session-token']
