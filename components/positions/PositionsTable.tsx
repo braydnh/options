@@ -7,11 +7,12 @@ interface Props {
   trades: Trade[]
   prices: PriceMap
   onAction: (trade: Trade, mode: TradePanelMode) => void
+  onDelete: (trade: Trade) => void
 }
 
 const HEADERS = ['Ticker', 'Type', 'Opened', 'Strike', 'Live Price', 'Premium In', 'Unreal. P&L', 'vs B&H', 'Capital', 'Delta', 'IV%', 'DTE', 'Actions']
 
-export function PositionsTable({ trades, prices, onAction }: Props) {
+export function PositionsTable({ trades, prices, onAction, onDelete }: Props) {
   if (trades.length === 0) {
     return (
       <div className="text-center py-16 text-text-muted text-sm">
@@ -48,6 +49,7 @@ export function PositionsTable({ trades, prices, onAction }: Props) {
               trade={trade}
               livePrice={prices[trade.ticker]}
               onAction={onAction}
+              onDelete={onDelete}
             />
           ))}
         </tbody>

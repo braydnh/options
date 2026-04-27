@@ -35,3 +35,8 @@ export async function updateTrade(id: string, updates: Partial<Trade>): Promise<
 
   if (error) throw error
 }
+
+export async function deleteTrade(id: string): Promise<void> {
+  const { error } = await supabase.from('trades').delete().eq('id', id)
+  if (error) throw error
+}

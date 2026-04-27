@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { StrategyBadge } from '@/components/ui/StrategyBadge'
 import { PnlBadge } from '@/components/ui/PnlBadge'
 import { DteBar } from '@/components/ui/DteBar'
@@ -10,9 +11,11 @@ interface Props {
   trade: Trade
   livePrice: number | undefined
   onAction: (trade: Trade, mode: TradePanelMode) => void
+  onDelete: (trade: Trade) => void
 }
 
-export function PositionRow({ trade, livePrice, onAction }: Props) {
+export function PositionRow({ trade, livePrice, onAction, onDelete }: Props) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const unrealizedPnl =
     livePrice !== undefined
       ? calcUnrealizedPnl(
@@ -111,17 +114,33 @@ export function PositionRow({ trade, livePrice, onAction }: Props) {
           <ActionButton onClick={() => onAction(trade, 'close')} label="Close" />
           <ActionButton onClick={() => onAction(trade, 'assign')} label="Assign" />
           <ActionButton onClick={() => onAction(trade, 'roll')} label="Roll" />
+          {confirmDelete ? (
+            <button
+              onClick={() => onDelete(trade)}
+              onBlur={() => setConfirmDelete(false)}
+              autoFocus
+              className="px-2 py-1 text-xs text-red-400 border border-red-500/50 rounded hover:bg-red-500/10 transition-colors"
+            >
+              Sure?
+            </button>
+          ) : (
+            <ActionButton onClick={() => setConfirmDelete(true)} label="Delete" danger />
+          )}
         </div>
       </td>
     </tr>
   )
 }
 
-function ActionButton({ onClick, label }: { onClick: () => void; label: string }) {
+function ActionButton({ onClick, label, danger }: { onClick: () => void; label: string; danger?: boolean }) {
   return (
     <button
       onClick={onClick}
-      className="px-2 py-1 text-xs text-text-muted border border-border rounded hover:text-white hover:border-accent-purple/50 transition-colors"
+      className={`px-2 py-1 text-xs border rounded transition-colors ${
+        danger
+          ? 'text-text-muted border-border hover:text-red-400 hover:border-red-500/50'
+          : 'text-text-muted border-border hover:text-white hover:border-accent-purple/50'
+      }`}
     >
       {label}
     </button>

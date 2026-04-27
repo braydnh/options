@@ -6,6 +6,7 @@ import { PositionsTable } from '@/components/positions/PositionsTable'
 import { TradePanel } from '@/components/trade-panel/TradePanel'
 import { useTrades } from '@/hooks/useTrades'
 import { useFinnhubPrices } from '@/hooks/useFinnhubPrices'
+import { deleteTrade } from '@/lib/supabase'
 import type { Trade, TradePanelMode } from '@/types'
 
 export default function PositionsPage() {
@@ -21,6 +22,11 @@ export default function PositionsPage() {
     setPanelMode('open')
     setActiveTrade(undefined)
     setPanelOpen(true)
+  }
+
+  async function handleDelete(trade: Trade) {
+    await deleteTrade(trade.id)
+    refresh()
   }
 
   function handleAction(trade: Trade, mode: TradePanelMode) {
@@ -47,6 +53,7 @@ export default function PositionsPage() {
               trades={openTrades}
               prices={prices}
               onAction={handleAction}
+              onDelete={handleDelete}
             />
           </div>
         )}
