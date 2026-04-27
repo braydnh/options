@@ -17,29 +17,25 @@ export async function POST(req: NextRequest) {
 
     const token = sessionToken.trim().replace(/^Bearer\s+/i, '')
 
-    // Verify token works by fetching account info
-    const accountRes = await fetch(`${BASE_URL}/customers/me/accounts`, {
-      headers: { ...HEADERS, Authorization: token },
-    })
+    // Fetch account number — tastytrade session tokens are valid from any IP
+    // (unlike login, which requires a trusted IP). Skip hard error if this fails;
+    // the sync route will surface a clearer message if the token is truly expired.
+    let accountNumber = ''
+    try {
+      const accountRes = await fetch(`${BASE_URL}/customers/me/accounts`, {
+        headers: { ...HEADERS, Authorization: token },
+      })
+      if (accountRes.ok) {
+        const accountData = await accountRes.json().catch(() => ({}))
+        accountNumber = accountData?.data?.items?.[0]?.account?.['account-number'] ?? ''
+      }
+    } catch { /* ignore — store token regardless */ }
 
-    if (!accountRes.ok) {
-      const text = await accountRes.text()
-      let msg = 'Session token is invalid or expired'
-      try {
-        const data = JSON.parse(text)
-        msg = data?.error?.message ?? msg
-      } catch { /* ignore */ }
-      return NextResponse.json({ error: msg }, { status: 400 })
-    }
-
-    const accountData = await accountRes.json().catch(() => ({}))
-    const accountNumber: string =
-      accountData?.data?.items?.[0]?.account?.['account-number'] ?? ''
-
-    await supabase.from('settings').upsert([
-      { key: 'tastytrade_session_token', value: token },
-      { key: 'tastytrade_account_number', value: accountNumber },
-    ])
+    await supabase.from('settings').delete().in('key', ['tastytrade_session_token', 'tastytrade_account_number'])
+    const rows: { key: string; value: string }[] = [{ key: 'tastytrade_session_token', value: token }]
+    if (accountNumber) rows.push({ key: 'tastytrade_account_number', value: accountNumber })
+    const { error: insertErr } = await supabase.from('settings').insert(rows)
+    if (insertErr) throw new Error(`Failed to save: ${insertErr.message}`)
 
     return NextResponse.json({ success: true, accountNumber })
   } catch (err) {
