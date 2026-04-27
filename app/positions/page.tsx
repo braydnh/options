@@ -6,17 +6,12 @@ import { PositionsTable } from '@/components/positions/PositionsTable'
 import { TradePanel } from '@/components/trade-panel/TradePanel'
 import { useTrades } from '@/hooks/useTrades'
 import { useFinnhubPrices } from '@/hooks/useFinnhubPrices'
-import { useTastytradeQuotes } from '@/hooks/useTastytradeQuotes'
-import { useTastytradeClient } from '@/hooks/useTastytradeClient'
 import type { Trade, TradePanelMode } from '@/types'
 
 export default function PositionsPage() {
   const { openTrades, loading, refresh } = useTrades()
-  const { client } = useTastytradeClient()
   const tickers = [...new Set(openTrades.map((t) => t.ticker))]
-  const ttPrices = useTastytradeQuotes(client ? tickers : [])
-  const fbPrices = useFinnhubPrices(client ? [] : tickers)
-  const prices = client ? ttPrices : fbPrices
+  const prices = useFinnhubPrices(tickers)
 
   const [panelOpen, setPanelOpen] = useState(false)
   const [panelMode, setPanelMode] = useState<TradePanelMode>('open')

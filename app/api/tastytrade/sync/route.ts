@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
 const BASE_URL = 'https://api.tastyworks.com'
+const HEADERS = {
+  'Content-Type': 'application/json',
+  'Accept': 'application/json',
+  'User-Agent': 'tastytrade-sdk-js',
+}
 
 interface ParsedTrade {
   ticker: string
@@ -38,49 +43,21 @@ function parseOccSymbol(symbol: string): { ticker: string; expiry: string; type:
   }
 }
 
-async function getAccessToken(clientId: string, clientSecret: string, refreshToken: string): Promise<string | null> {
-  const res = await fetch(`${BASE_URL}/oauth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': 'tastytrade-sdk-js' },
-    body: JSON.stringify({
-      'grant-type': 'refresh_token',
-      'refresh-token': refreshToken,
-      'client-id': clientId,
-      'client-secret': clientSecret,
-    }),
-  })
-  if (!res.ok) return null
-  const data = await res.json()
-  return data?.access_token ?? data?.['access-token'] ?? null
-}
-
 export async function GET() {
   try {
-    const clientId = process.env.TASTYTRADE_CLIENT_ID
-    const clientSecret = process.env.TASTYTRADE_CLIENT_SECRET
-    if (!clientId || !clientSecret) {
-      return NextResponse.json({ error: 'Server env vars not set' }, { status: 500 })
-    }
-
     const { data: rows } = await supabase
       .from('settings')
       .select('key, value')
-      .in('key', ['tastytrade_refresh_token', 'tastytrade_account_number'])
+      .in('key', ['tastytrade_session_token', 'tastytrade_account_number'])
 
     const settings = Object.fromEntries((rows ?? []).map((r) => [r.key, r.value]))
-    const refreshToken = settings['tastytrade_refresh_token']
+    const sessionToken = settings['tastytrade_session_token']
     const accountNumber = settings['tastytrade_account_number']
 
-    if (!refreshToken || !accountNumber) {
+    if (!sessionToken || !accountNumber) {
       return NextResponse.json({ error: 'tastytrade not connected' }, { status: 400 })
     }
 
-    const accessToken = await getAccessToken(clientId, clientSecret, refreshToken)
-    if (!accessToken) {
-      return NextResponse.json({ error: 'Failed to refresh access token' }, { status: 401 })
-    }
-
-    // Fetch last 90 days of filled orders
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - 90)
     const startDateStr = startDate.toISOString().split('T')[0]
@@ -91,10 +68,15 @@ export async function GET() {
     ordersUrl.searchParams.set('start-date', startDateStr)
 
     const ordersRes = await fetch(ordersUrl.toString(), {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { ...HEADERS, Authorization: sessionToken },
     })
+
     if (!ordersRes.ok) {
-      return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 })
+      const text = await ordersRes.text()
+      if (ordersRes.status === 401) {
+        return NextResponse.json({ error: 'Session token expired — paste a fresh one in Settings' }, { status: 401 })
+      }
+      return NextResponse.json({ error: `Failed to fetch orders (${ordersRes.status}): ${text.slice(0, 200)}` }, { status: 500 })
     }
 
     const ordersData = await ordersRes.json()
@@ -138,7 +120,6 @@ export async function GET() {
       }
     }
 
-    // Sort newest first
     trades.sort((a, b) => b.date_opened.localeCompare(a.date_opened))
 
     return NextResponse.json({ trades })

@@ -35,6 +35,25 @@ async function safeJson(res, step) {
   catch { throw new Error(`${step} returned non-JSON (${res.status}): ${text.slice(0, 300)}`) }
 }
 
+function dumpHeaders(res) {
+  console.log('\nResponse headers:')
+  res.headers.forEach((v, k) => console.log(`  ${k}: ${v}`))
+}
+
+async function doAuthorize(sessionToken, clientId, redirectUri, extraHeaders = {}) {
+  return fetch(`${BASE_URL}/oauth/authorize`, {
+    method: 'POST',
+    headers: { ...HEADERS, Authorization: sessionToken, ...extraHeaders },
+    body: JSON.stringify({
+      'client-id': clientId,
+      'redirect-uri': redirectUri,
+      'response-type': 'code',
+      scope: 'read openid',
+    }),
+    redirect: 'manual',
+  })
+}
+
 async function main() {
   console.log('\n── tastytrade token from existing session ──\n')
 
@@ -46,36 +65,87 @@ async function main() {
   const clientSecret = await ask('Client Secret (TASTYTRADE_CLIENT_SECRET from Vercel): ')
   const redirectUri  = 'https://options-ochre.vercel.app/api/auth/callback'
 
-  // OAuth authorize using existing session token
+  // First authorize attempt
   process.stdout.write('\nAuthorizing...')
-  const authRes = await fetch(`${BASE_URL}/oauth/authorize`, {
-    method: 'POST',
-    headers: { ...HEADERS, Authorization: sessionToken },
-    body: JSON.stringify({
-      'client-id': clientId,
-      'redirect-uri': redirectUri,
-      'response-type': 'code',
-      scope: 'read openid',
-    }),
-    redirect: 'manual',
-  })
+  let authRes = await doAuthorize(sessionToken, clientId, redirectUri)
+
+  // Dump all response headers so we can see what tastytrade sends back
+  console.log('')
+  dumpHeaders(authRes)
 
   let authCode = null
+
   if (authRes.status === 302 || authRes.status === 301) {
     const loc = authRes.headers.get('location') ?? ''
     try { authCode = new URL(loc).searchParams.get('code') }
     catch { authCode = new URLSearchParams(loc.split('?')[1] ?? '').get('code') }
   } else {
     const body = await safeJson(authRes, '/oauth/authorize').catch((e) => { throw e })
-    authCode = body?.code ?? body?.data?.code ?? null
-    if (!authCode) {
-      console.log('\nAuthorize response:')
+
+    // Check if tastytrade is asking for 2FA
+    const isTwoFactor =
+      authRes.status === 401 &&
+      (body?.error?.message?.toLowerCase().includes('two factor') ||
+       body?.error?.message?.toLowerCase().includes('otp') ||
+       body?.error?.code === 'invalid_credentials')
+
+    if (isTwoFactor) {
+      // tastytrade sends the challenge token in a response header
+      const challengeToken =
+        authRes.headers.get('x-tastyworks-challenge-token') ??
+        authRes.headers.get('X-Tastyworks-Challenge-Token') ??
+        body?.error?.['challenge-token'] ??
+        body?.['challenge-token'] ?? null
+
+      console.log('\nAuthorize response body:')
       console.log(JSON.stringify(body, null, 2))
-      throw new Error(`OAuth authorize failed (${authRes.status}) — session token may be expired or wrong client ID`)
+
+      if (challengeToken) {
+        console.log(`\nChallenge token captured: ${challengeToken}`)
+        console.log('tastytrade should send an OTP to your registered device (app / email / SMS).')
+      } else {
+        console.log('\nNo challenge token found in headers or body.')
+        console.log('tastytrade may have already sent an OTP to your registered device.')
+      }
+
+      const otp = await ask('\nEnter the OTP code (or press Enter to skip and retry without it): ')
+      if (!otp) throw new Error('No OTP provided. Check your tastytrade app, email, or SMS.')
+
+      const otpHeaders = {
+        'X-Tastyworks-OTP': otp,
+        ...(challengeToken ? { 'X-Tastyworks-Challenge-Token': challengeToken } : {}),
+      }
+
+      process.stdout.write('Retrying authorize with OTP...')
+      authRes = await doAuthorize(sessionToken, clientId, redirectUri, otpHeaders)
+      console.log('')
+      dumpHeaders(authRes)
+
+      if (authRes.status === 302 || authRes.status === 301) {
+        const loc = authRes.headers.get('location') ?? ''
+        try { authCode = new URL(loc).searchParams.get('code') }
+        catch { authCode = new URLSearchParams(loc.split('?')[1] ?? '').get('code') }
+      } else {
+        const body2 = await safeJson(authRes, '/oauth/authorize (otp)').catch((e) => { throw e })
+        authCode = body2?.code ?? body2?.data?.code ?? null
+        if (!authCode) {
+          console.log('\nOTP authorize response:')
+          console.log(JSON.stringify(body2, null, 2))
+          throw new Error(`OAuth authorize failed after OTP (${authRes.status})`)
+        }
+      }
+    } else {
+      authCode = body?.code ?? body?.data?.code ?? null
+      if (!authCode) {
+        console.log('\nAuthorize response:')
+        console.log(JSON.stringify(body, null, 2))
+        throw new Error(`OAuth authorize failed (${authRes.status}) — session token may be expired or wrong client ID`)
+      }
     }
   }
+
   if (!authCode) throw new Error(`No auth code in redirect (${authRes.status}). Check redirect URI matches: ${redirectUri}`)
-  console.log(' done.')
+  console.log('Auth code received.')
 
   // Exchange code for tokens
   process.stdout.write('Exchanging code for tokens...')

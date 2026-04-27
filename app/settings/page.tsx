@@ -30,7 +30,7 @@ export default function SettingsPage() {
 function SettingsContent() {
   const { client, config, loading } = useTastytradeClient()
 
-  const [refreshToken, setRefreshToken] = useState('')
+  const [sessionToken, setSessionToken] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -53,12 +53,12 @@ function SettingsContent() {
       const res = await fetch('/api/tastytrade/save-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
+        body: JSON.stringify({ sessionToken }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Failed to save token')
       setSaveSuccess(true)
-      setRefreshToken('')
+      setSessionToken('')
       window.location.reload()
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save token')
@@ -162,21 +162,23 @@ function SettingsContent() {
           {!isConnected && (
             <form onSubmit={handleSaveToken} className="flex flex-col gap-4">
               <div className="bg-bg-base border border-border rounded-md px-4 py-3 text-sm text-text-muted leading-relaxed">
-                <p className="text-white font-medium mb-1">One-time setup</p>
-                <p>Run this in your terminal from the project folder:</p>
-                <code className="block mt-2 text-xs bg-black/40 rounded px-3 py-2 text-green-400 select-all">
-                  node scripts/get-tastytrade-token.mjs
-                </code>
-                <p className="mt-2">It logs into tastytrade from your local machine (trusted IP), prints a refresh token, then paste it below.</p>
+                <p className="text-white font-medium mb-1">How to get your session token</p>
+                <ol className="list-decimal list-inside space-y-1 mt-1">
+                  <li>Open <span className="text-white">tastytrade.com</span> and log in</li>
+                  <li>Open DevTools (F12) → <span className="text-white">Network</span> tab</li>
+                  <li>Filter by <code className="text-green-400 bg-black/30 px-1 rounded">api.tastyworks</code> and click any request</li>
+                  <li>Under <span className="text-white">Request Headers</span>, copy the <code className="text-green-400 bg-black/30 px-1 rounded">Authorization</code> value</li>
+                </ol>
+                <p className="mt-2 text-xs">The token refreshes when you re-login to tastytrade. Re-paste it here if sync stops working.</p>
               </div>
               <div>
-                <label className="block text-[10px] tracking-widest text-text-muted mb-1.5 uppercase">Refresh Token</label>
+                <label className="block text-[10px] tracking-widest text-text-muted mb-1.5 uppercase">Session Token</label>
                 <input
                   required
                   type="password"
-                  value={refreshToken}
-                  onChange={(e) => setRefreshToken(e.target.value)}
-                  placeholder="Paste token from the script output"
+                  value={sessionToken}
+                  onChange={(e) => setSessionToken(e.target.value)}
+                  placeholder="Paste Authorization header value from tastytrade"
                   className={inputCls}
                 />
               </div>
