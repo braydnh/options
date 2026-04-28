@@ -87,8 +87,8 @@ export function TradePanelForm({ openTrades, onSuccess, onCancel, initialTrade }
         setForm(makeDefault())
       }
       onSuccess()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save trade')
+    } catch (err: any) {
+      setError(err?.message ?? err?.details ?? String(err))
     } finally {
       setSubmitting(false)
     }
