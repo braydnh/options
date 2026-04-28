@@ -163,13 +163,17 @@ function SettingsContent() {
             <form onSubmit={handleSaveToken} className="flex flex-col gap-4">
               <div className="bg-bg-base border border-border rounded-md px-4 py-3 text-sm text-text-muted leading-relaxed">
                 <p className="text-white font-medium mb-1">How to get your session token</p>
-                <ol className="list-decimal list-inside space-y-1 mt-1">
-                  <li>Open <span className="text-white">tastytrade.com</span> and log in</li>
-                  <li>Open DevTools (F12) → <span className="text-white">Network</span> tab</li>
-                  <li>Filter by <code className="text-green-400 bg-black/30 px-1 rounded">api.tastyworks</code> and click any request</li>
-                  <li>Under <span className="text-white">Request Headers</span>, copy the <code className="text-green-400 bg-black/30 px-1 rounded">Authorization</code> value</li>
+                <ol className="list-decimal list-inside space-y-1.5 mt-1">
+                  <li>Open <span className="text-white">my.tastytrade.com</span> in your browser (stay logged in)</li>
+                  <li>Open DevTools → <span className="text-white">Console</span> tab and paste this:</li>
                 </ol>
-                <p className="mt-2 text-xs">The token refreshes when you re-login to tastytrade. Re-paste it here if sync stops working.</p>
+                <code className="block mt-2 text-[11px] bg-black/40 rounded px-3 py-2 text-green-400 select-all leading-relaxed whitespace-pre-wrap break-all">
+{`const o=fetch;window.fetch=function(u,p){if(typeof u==='string'&&u.includes('tastyworks')){const a=p?.headers?.Authorization;if(a){navigator.clipboard.writeText(a).catch(()=>{});alert('Copied! Paste it below.');window.fetch=o;}}return o.apply(this,arguments);};`}
+                </code>
+                <ol className="list-decimal list-inside space-y-1 mt-2" start={3}>
+                  <li>Press Enter, then click anything in the tastytrade app</li>
+                  <li>Your token is copied — paste it below</li>
+                </ol>
               </div>
               <div>
                 <label className="block text-[10px] tracking-widest text-text-muted mb-1.5 uppercase">Session Token</label>
