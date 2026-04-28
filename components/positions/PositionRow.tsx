@@ -45,6 +45,9 @@ export function PositionRow({ trade, livePrice, onAction, onDelete }: Props) {
         <StrategyBadge strategy={trade.strategy} />
       </td>
       <td className="py-3 px-4 text-sm tabular-nums text-text-muted">
+        {trade.contracts}x
+      </td>
+      <td className="py-3 px-4 text-sm tabular-nums text-text-muted">
         {new Date(trade.date_opened).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: '2-digit' })}
       </td>
       <td className="py-3 px-4 text-sm tabular-nums">

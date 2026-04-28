@@ -10,7 +10,7 @@ interface Props {
   onDelete: (trade: Trade) => void
 }
 
-const HEADERS = ['Ticker', 'Type', 'Opened', 'Strike', 'Live Price', 'Premium In', 'Unreal. P&L', 'vs B&H', 'Capital', 'Delta', 'IV%', 'DTE', 'Actions']
+const HEADERS = ['Ticker', 'Type', 'Qty', 'Opened', 'Strike', 'Live Price', 'Premium In', 'Unreal. P&L', 'vs B&H', 'Capital', 'Delta', 'IV%', 'DTE', 'Actions']
 
 export function PositionsTable({ trades, prices, onAction, onDelete }: Props) {
   if (trades.length === 0) {
