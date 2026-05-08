@@ -9,6 +9,9 @@ interface Props {
 
 export function StatsRow({ trades, openTrades }: Props) {
   const closedTrades = trades.filter((t) => t.status !== 'open')
+  // Only fully closed trades count toward win rate — assigned trades are still
+  // open exposure (shares held) and haven't realised a final P&L yet.
+  const settledTrades = closedTrades.filter((t) => t.status === 'closed')
 
   const totalPnl = closedTrades.reduce(
     (sum, t) => sum + calcNetPremium(t.premium_in, t.premium_out, t.brokerage_fees),
@@ -20,10 +23,10 @@ export function StatsRow({ trades, openTrades }: Props) {
     0
   )
 
-  const winCount = closedTrades.filter(
+  const winCount = settledTrades.filter(
     (t) => calcNetPremium(t.premium_in, t.premium_out, t.brokerage_fees) > 0
   ).length
-  const winRate = closedTrades.length > 0 ? (winCount / closedTrades.length) * 100 : 0
+  const winRate = settledTrades.length > 0 ? (winCount / settledTrades.length) * 100 : 0
 
   const avgRoc = (() => {
     if (closedTrades.length === 0) return null
@@ -98,7 +101,7 @@ export function StatsRow({ trades, openTrades }: Props) {
       <div className="bg-bg-panel border border-border rounded-lg p-4">
         <p className="text-[10px] tracking-widest text-text-muted uppercase mb-2">Win Rate</p>
         <span className="text-accent-purple text-xl font-semibold">
-          {closedTrades.length > 0 ? `${Math.round(winRate)}%` : '—'}
+          {settledTrades.length > 0 ? `${Math.round(winRate)}%` : '—'}
         </span>
       </div>
     </div>
