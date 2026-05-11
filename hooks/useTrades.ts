@@ -7,6 +7,7 @@ import type { Trade } from '@/types'
 interface UseTradesResult {
   trades: Trade[]
   openTrades: Trade[]
+  assignedTrades: Trade[]
   closedTrades: Trade[]
   loading: boolean
   error: string | null
@@ -36,7 +37,8 @@ export function useTrades(): UseTradesResult {
   }, [refresh])
 
   const openTrades = trades.filter((t) => t.status === 'open')
-  const closedTrades = trades.filter((t) => t.status !== 'open')
+  const assignedTrades = trades.filter((t) => t.status === 'assigned')
+  const closedTrades = trades.filter((t) => t.status === 'closed')
 
-  return { trades, openTrades, closedTrades, loading, error, refresh }
+  return { trades, openTrades, assignedTrades, closedTrades, loading, error, refresh }
 }

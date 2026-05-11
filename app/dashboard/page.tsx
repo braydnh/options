@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { StatsRow } from '@/components/dashboard/StatsRow'
+import { ShareHoldingsSection } from '@/components/dashboard/ShareHoldingsSection'
 import { PositionsPreview } from '@/components/dashboard/PositionsPreview'
 import { PnlChart } from '@/components/dashboard/PnlChart'
 import { TradePanel } from '@/components/trade-panel/TradePanel'
@@ -10,8 +11,8 @@ import { useTrades } from '@/hooks/useTrades'
 import { useFinnhubPrices } from '@/hooks/useFinnhubPrices'
 
 export default function DashboardPage() {
-  const { trades, openTrades, closedTrades, loading, refresh } = useTrades()
-  const tickers = [...new Set(openTrades.map((t) => t.ticker))]
+  const { trades, openTrades, assignedTrades, closedTrades, loading, refresh } = useTrades()
+  const tickers = [...new Set([...openTrades, ...assignedTrades].map((t) => t.ticker))]
   const prices = useFinnhubPrices(tickers)
   const [panelOpen, setPanelOpen] = useState(false)
 
@@ -27,6 +28,7 @@ export default function DashboardPage() {
         ) : (
           <>
             <StatsRow trades={trades} openTrades={openTrades} />
+            <ShareHoldingsSection assignedTrades={assignedTrades} prices={prices} onRefresh={refresh} />
             <PositionsPreview openTrades={openTrades} prices={prices} />
             <PnlChart closedTrades={closedTrades} />
           </>
