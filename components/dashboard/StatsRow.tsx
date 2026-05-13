@@ -1,44 +1,48 @@
 import { PnlBadge } from '@/components/ui/PnlBadge'
-import { calcNetPremium, calcCapitalSecured, calcReturnOnCapital } from '@/lib/calculations'
-import type { Trade } from '@/types'
+import { calcNetPremium, calcCapitalSecured, calcUnrealizedPnl } from '@/lib/calculations'
+import type { Trade, PriceMap } from '@/types'
 
 interface Props {
   trades: Trade[]
   openTrades: Trade[]
+  assignedTrades: Trade[]
+  prices: PriceMap
 }
 
-export function StatsRow({ trades, openTrades }: Props) {
-  const closedTrades = trades.filter((t) => t.status !== 'open')
-  // Only fully closed trades count toward win rate — assigned trades are still
-  // open exposure (shares held) and haven't realised a final P&L yet.
-  const settledTrades = closedTrades.filter((t) => t.status === 'closed')
+export function StatsRow({ trades, openTrades, assignedTrades, prices }: Props) {
+  const closedTrades = trades.filter((t) => t.status === 'closed')
 
-  const totalPnl = closedTrades.reduce(
+  // Realised: all fully closed trades
+  const realisedPnl = closedTrades.reduce(
     (sum, t) => sum + calcNetPremium(t.premium_in, t.premium_out, t.brokerage_fees),
     0
   )
+
+  // Unrealised options: open positions where we have a live price
+  const unrealisedOptions = openTrades.reduce((sum, t) => {
+    const price = prices[t.ticker]
+    if (price === undefined) return sum
+    return sum + calcUnrealizedPnl(t.strategy, t.premium_in, t.strike_price, t.contracts, price)
+  }, 0)
+
+  // Unrealised shares: assigned holdings where we have a live price
+  const unrealisedShares = assignedTrades.reduce((sum, t) => {
+    const price = prices[t.ticker]
+    if (price === undefined) return sum
+    const shares = t.shares ?? t.contracts * 100
+    const costBasis = t.cost_basis ?? (t.strike_price - t.premium_in / shares)
+    return sum + (price - costBasis) * shares
+  }, 0)
+
+  const unrealisedPnl = unrealisedOptions + unrealisedShares
+  const netTotal = realisedPnl + unrealisedPnl
 
   const totalCapital = openTrades.reduce(
     (sum, t) => sum + calcCapitalSecured(t.strike_price, t.contracts),
     0
   )
 
-  const winCount = settledTrades.filter(
-    (t) => calcNetPremium(t.premium_in, t.premium_out, t.brokerage_fees) > 0
-  ).length
-  const winRate = settledTrades.length > 0 ? (winCount / settledTrades.length) * 100 : 0
-
-  const avgRoc = (() => {
-    if (closedTrades.length === 0) return null
-    const total = closedTrades.reduce((sum, t) => {
-      const net = calcNetPremium(t.premium_in, t.premium_out, t.brokerage_fees)
-      const cap = calcCapitalSecured(t.strike_price, t.contracts)
-      return sum + calcReturnOnCapital(net, cap)
-    }, 0)
-    return (total / closedTrades.length) * 100
-  })()
-
-  const { thisMonthPnl, thisMonthCapital } = (() => {
+  const { thisMonthPnl, thisMonthPct } = (() => {
     const now = new Date()
     const monthTrades = closedTrades.filter((t) => {
       if (!t.date_closed) return false
@@ -53,34 +57,30 @@ export function StatsRow({ trades, openTrades }: Props) {
       (sum, t) => sum + calcCapitalSecured(t.strike_price, t.contracts),
       0
     )
-    return { thisMonthPnl: pnl, thisMonthCapital: cap }
+    return { thisMonthPnl: pnl, thisMonthPct: cap > 0 ? (pnl / cap) * 100 : null }
   })()
-
-  const thisMonthPct = thisMonthCapital > 0 ? (thisMonthPnl / thisMonthCapital) * 100 : null
 
   return (
     <div className="grid grid-cols-3 gap-4 mb-8">
-      {/* Row 1 */}
-      <div className="bg-bg-panel border border-border rounded-lg p-4">
-        <p className="text-[10px] tracking-widest text-text-muted uppercase mb-2">Total P&L</p>
-        <PnlBadge value={Math.round(totalPnl)} className="text-xl" />
-      </div>
+      <StatCard label="Realised P&L">
+        <PnlBadge value={Math.round(realisedPnl)} className="text-xl" />
+      </StatCard>
 
-      <div className="bg-bg-panel border border-border rounded-lg p-4">
-        <p className="text-[10px] tracking-widest text-text-muted uppercase mb-2">Capital Allocated</p>
+      <StatCard label="Unrealised P&L">
+        <PnlBadge value={Math.round(unrealisedPnl)} className="text-xl" />
+      </StatCard>
+
+      <StatCard label="Net Total">
+        <PnlBadge value={Math.round(netTotal)} className="text-xl" />
+      </StatCard>
+
+      <StatCard label="Capital Allocated">
         <span className="text-white text-xl font-semibold">
           ${totalCapital.toLocaleString('en-AU')}
         </span>
-      </div>
+      </StatCard>
 
-      <div className="bg-bg-panel border border-border rounded-lg p-4">
-        <p className="text-[10px] tracking-widest text-text-muted uppercase mb-2">Open Positions</p>
-        <span className="text-white text-xl font-semibold">{openTrades.length}</span>
-      </div>
-
-      {/* Row 2 */}
-      <div className="bg-bg-panel border border-border rounded-lg p-4">
-        <p className="text-[10px] tracking-widest text-text-muted uppercase mb-2">This Month</p>
+      <StatCard label="This Month">
         <div className="flex items-baseline gap-2">
           <PnlBadge value={Math.round(thisMonthPnl)} className="text-xl" />
           {thisMonthPct !== null && (
@@ -89,21 +89,20 @@ export function StatsRow({ trades, openTrades }: Props) {
             </span>
           )}
         </div>
-      </div>
+      </StatCard>
 
-      <div className="bg-bg-panel border border-border rounded-lg p-4">
-        <p className="text-[10px] tracking-widest text-text-muted uppercase mb-2">Avg ROC</p>
-        <span className={`text-xl font-semibold ${avgRoc !== null && avgRoc >= 0 ? 'text-accent-purple' : 'text-accent-red'}`}>
-          {avgRoc !== null ? `${avgRoc >= 0 ? '+' : ''}${avgRoc.toFixed(2)}%` : '—'}
-        </span>
-      </div>
+      <StatCard label="Open Positions">
+        <span className="text-white text-xl font-semibold">{openTrades.length}</span>
+      </StatCard>
+    </div>
+  )
+}
 
-      <div className="bg-bg-panel border border-border rounded-lg p-4">
-        <p className="text-[10px] tracking-widest text-text-muted uppercase mb-2">Win Rate</p>
-        <span className="text-accent-purple text-xl font-semibold">
-          {settledTrades.length > 0 ? `${Math.round(winRate)}%` : '—'}
-        </span>
-      </div>
+function StatCard({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-bg-panel border border-border rounded-lg p-4">
+      <p className="text-[10px] tracking-widest text-text-muted uppercase mb-2">{label}</p>
+      {children}
     </div>
   )
 }

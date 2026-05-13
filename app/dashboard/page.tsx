@@ -27,7 +27,7 @@ export default function DashboardPage() {
           <div className="text-text-muted text-sm animate-pulse">Loading...</div>
         ) : (
           <>
-            <StatsRow trades={trades} openTrades={openTrades} />
+            <StatsRow trades={trades} openTrades={openTrades} assignedTrades={assignedTrades} prices={prices} />
             <ShareHoldingsSection assignedTrades={assignedTrades} prices={prices} onRefresh={refresh} />
             <PositionsPreview openTrades={openTrades} prices={prices} />
             <PnlChart closedTrades={closedTrades} />
