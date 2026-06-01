@@ -133,8 +133,8 @@ function CloseAssignForm({ mode, trade, onSuccess, onCancel }: CloseAssignFormPr
         underlying_price_at_close: underlyingPriceAtClose ? parseFloat(underlyingPriceAtClose) : null,
       })
       onSuccess()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to close trade')
+    } catch (err: any) {
+      setError(err?.message ?? err?.details ?? 'Failed to close trade')
     } finally {
       setSubmitting(false)
     }
@@ -153,8 +153,8 @@ function CloseAssignForm({ mode, trade, onSuccess, onCancel }: CloseAssignFormPr
         cost_basis: parseFloat(costBasis),
       })
       onSuccess()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to mark as assigned')
+    } catch (err: any) {
+      setError(err?.message ?? err?.details ?? 'Failed to mark as assigned')
     } finally {
       setSubmitting(false)
     }
@@ -165,12 +165,7 @@ function CloseAssignForm({ mode, trade, onSuccess, onCancel }: CloseAssignFormPr
     setSubmitting(true)
     setError(null)
     try {
-      await updateTrade(trade.id, {
-        status: 'closed',
-        premium_out: parseFloat(premiumOut) || 0,
-        date_closed: dateClosed,
-        closing_action: 'buy_to_close',
-      })
+      // Insert the new trade first — if this fails the original stays open
       await insertTrade({
         date_opened: dateClosed,
         ticker: trade.ticker,
@@ -196,9 +191,16 @@ function CloseAssignForm({ mode, trade, onSuccess, onCancel }: CloseAssignFormPr
         underlying_price_at_open: null,
         underlying_price_at_close: null,
       })
+      // Only close the original once the new one is safely saved
+      await updateTrade(trade.id, {
+        status: 'closed',
+        premium_out: parseFloat(premiumOut) || 0,
+        date_closed: dateClosed,
+        closing_action: 'buy_to_close',
+      })
       onSuccess()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to roll trade')
+    } catch (err: any) {
+      setError(err?.message ?? err?.details ?? 'Failed to roll trade')
     } finally {
       setSubmitting(false)
     }
