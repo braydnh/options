@@ -145,13 +145,33 @@ function CloseAssignForm({ mode, trade, onSuccess, onCancel }: CloseAssignFormPr
     setSubmitting(true)
     setError(null)
     try {
-      await updateTrade(trade.id, {
-        status: 'assigned',
-        assignment_status: 'assigned',
-        date_closed: dateClosed,
-        shares: parseInt(shares),
-        cost_basis: parseFloat(costBasis),
-      })
+      if (trade.strategy === 'covered_call') {
+        // Shares called away — close the CC trade
+        await updateTrade(trade.id, {
+          status: 'closed',
+          closing_action: 'called_away',
+          date_closed: dateClosed,
+          underlying_price_at_close: parseFloat(costBasis) || null,
+        })
+        // If this CC is linked to a CSP holding, close that holding too
+        if (trade.linked_trade_id) {
+          await updateTrade(trade.linked_trade_id, {
+            status: 'closed',
+            closing_action: 'shares_sold',
+            date_closed: dateClosed,
+            underlying_price_at_close: parseFloat(costBasis) || null,
+          })
+        }
+      } else {
+        // CSP assigned — receive shares, show in holdings
+        await updateTrade(trade.id, {
+          status: 'assigned',
+          assignment_status: 'assigned',
+          date_closed: dateClosed,
+          shares: parseInt(shares),
+          cost_basis: parseFloat(costBasis),
+        })
+      }
       onSuccess()
     } catch (err: any) {
       setError(err?.message ?? err?.details ?? 'Failed to mark as assigned')
@@ -279,29 +299,48 @@ function CloseAssignForm({ mode, trade, onSuccess, onCancel }: CloseAssignFormPr
   }
 
   if (mode === 'assign') {
+    const isCC = trade.strategy === 'covered_call'
     return (
       <form onSubmit={handleAssign} className="flex flex-col gap-4">
         <TradeSummary />
-        <Field label="SHARES ASSIGNED">
-          <input
-            required
-            type="number"
-            value={shares}
-            onChange={(e) => setShares(e.target.value)}
-            className={inputCls}
-          />
-        </Field>
-        <Field label="COST BASIS PER SHARE ($)">
-          <input
-            required
-            type="number"
-            step="0.01"
-            value={costBasis}
-            onChange={(e) => setCostBasis(e.target.value)}
-            className={inputCls}
-          />
-        </Field>
-        <Field label="DATE ASSIGNED">
+        {isCC ? (
+          <>
+            <p className="text-xs text-text-muted">Shares called away at strike. This will close the CC and remove the linked holding.</p>
+            <Field label="SALE PRICE PER SHARE ($)">
+              <input
+                required
+                type="number"
+                step="0.01"
+                value={costBasis}
+                onChange={(e) => setCostBasis(e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+          </>
+        ) : (
+          <>
+            <Field label="SHARES ASSIGNED">
+              <input
+                required
+                type="number"
+                value={shares}
+                onChange={(e) => setShares(e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="COST BASIS PER SHARE ($)">
+              <input
+                required
+                type="number"
+                step="0.01"
+                value={costBasis}
+                onChange={(e) => setCostBasis(e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+          </>
+        )}
+        <Field label={isCC ? 'DATE CALLED AWAY' : 'DATE ASSIGNED'}>
           <input
             required
             type="date"
@@ -311,7 +350,7 @@ function CloseAssignForm({ mode, trade, onSuccess, onCancel }: CloseAssignFormPr
           />
         </Field>
         {error && <p className="text-accent-red text-xs">{error}</p>}
-        <Buttons submitLabel="Mark Assigned" />
+        <Buttons submitLabel={isCC ? 'Mark Called Away' : 'Mark Assigned'} />
       </form>
     )
   }
