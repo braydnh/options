@@ -86,8 +86,9 @@ export function calcCumulativePnl(
 
 export function groupByMonth(
   closedTrades: Trade[]
-): { month: string; pnl: number }[] {
-  const map = new Map<string, number>()
+): { month: string; pnl: number; capital: number; pct: number }[] {
+  const pnlMap = new Map<string, number>()
+  const capMap = new Map<string, number>()
 
   const sorted = [...closedTrades]
     .filter((t) => t.date_closed)
@@ -97,8 +98,13 @@ export function groupByMonth(
     const d = new Date(t.date_closed!)
     const label = d.toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })
     const net = calcNetPremium(t.premium_in, t.premium_out, t.brokerage_fees)
-    map.set(label, (map.get(label) ?? 0) + net)
+    const cap = calcCapitalSecured(t.strike_price, t.contracts)
+    pnlMap.set(label, (pnlMap.get(label) ?? 0) + net)
+    capMap.set(label, (capMap.get(label) ?? 0) + cap)
   }
 
-  return Array.from(map.entries()).map(([month, pnl]) => ({ month, pnl }))
+  return Array.from(pnlMap.entries()).map(([month, pnl]) => {
+    const capital = capMap.get(month) ?? 0
+    return { month, pnl, capital, pct: capital > 0 ? (pnl / capital) * 100 : 0 }
+  })
 }
